@@ -1,0 +1,5 @@
+{
+	"id": "terrain.floor",
+	"baseMovementCost": "1",
+	"tileColor": "white"
+}
