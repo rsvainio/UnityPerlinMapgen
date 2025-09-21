@@ -91,9 +91,9 @@ public static class MapGeneration
     //varies tile temperatures based on pole proximity and elevation
     public static Dictionary<(int, int, int), float> TemperatureRefinementPass(HexGrid grid, Dictionary<(int, int, int), float> temperatureMap, Dictionary<(int, int, int), float> altitudeMap, bool warmPoles = false)
     {
-        float poleTemp = 0.7f;
-        float equatorTemp = 1f;
-        if (warmPoles) { poleTemp = 1f; equatorTemp = 0.7f; }
+        float poleTemp = 0.65f;
+        float equatorTemp = 1.35f;
+        if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.65f; }
 
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
@@ -106,8 +106,9 @@ public static class MapGeneration
             float sine = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
 
             float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, sine);
-            newTemperature = Mathf.Lerp(newTemperature, 1f - altitude, Mathf.Pow(altitude, 1.75f));
+            newTemperature = newTemperature * Mathf.Lerp(1.5f, 0.5f, altitude);
 
+            newTemperature = Mathf.Clamp01(newTemperature);
             temperatureMap[entry.Key] = newTemperature;
         }
 
@@ -117,45 +118,41 @@ public static class MapGeneration
     public static void GenerateTerrainFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
     {
         //GenerateMountains(grid)
-        GenerateRivers(grid, altitudeMap);
+        GenerateRivers(grid);
         //GenerateForests(grid)
     }
 
-    public static void GenerateRivers(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, int riverCount = 3, float minimumAltitude = 0.5f)
+    public static void GenerateRivers(HexGrid grid, float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
-        List<HexTile> riverStartingPointCandidates = new List<HexTile>();
-        List<HexTile>[] rivers = new List<HexTile>[riverCount];
+        List<HexTile> riverSourceCandidates = grid.GetTiles().Where(t => t.GetAltitude() >= minAltitude
+                                                && t.GetTemperature() >= minPrecipitation
+                                                && t.GetPrecipitation() >= minTemperature)
+                                            .ToList();
+        riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.GetAltitude()).ToList(); // sort the list of candidates by altitude
+        Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
+        List<List<HexTile>> rivers = new List<List<HexTile>>();
         System.Random rand = new System.Random();
 
-        // this can still fail to find any starting points
-        while (riverStartingPointCandidates.Count < riverCount * 2)
+        /*
+        // Debug.Log(riverStartingPointCandidates.Count);
+        int n = rand.Next(riverSourceCandidates.Count);
+        HexTile tile = riverSourceCandidates[n];
+        List<HexTile> newRiver = RiverRecursion(tile);
+        rivers.Add(newRiver);
+
+        riverSourceCandidates.Remove(tile);
+        */
+
+        foreach (HexTile tile in riverSourceCandidates)
         {
-            foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-            {
-                float altitude = entry.Value;
+            float weight = tile.GetPrecipitation() * tile.GetAltitude();
+            if (rand.NextDouble() > weight) { continue; }
 
-                if (altitude > minimumAltitude)
-                {
-                    HexTile tile = grid.FetchTile(entry.Key);
-                    riverStartingPointCandidates.Add(tile);
-                }
-            }
-
-            // Debug.Log(minimumAltitude);
-            minimumAltitude =- 0.1f;
-        }
-
-        for (int i = 0; i < riverCount; i++)
-        {
-            // Debug.Log(riverStartingPointCandidates.Count);
-            int n = rand.Next(riverStartingPointCandidates.Count);
-            HexTile tile = riverStartingPointCandidates[n];
             List<HexTile> newRiver = RiverRecursion(tile);
-            rivers[i] = newRiver;
-
-            riverStartingPointCandidates.Remove(tile);
+            rivers.Add(newRiver);
         }
 
+        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
         grid.rivers = rivers;
     }
 

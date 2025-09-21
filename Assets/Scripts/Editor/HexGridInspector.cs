@@ -8,14 +8,15 @@ public class HexGridInspector : Editor
 {
     float precipitationScale = 2f;
     float precipitationExponent = 2f;
-    float altitudeScale = 2f;
-    float altitudeExponent = 2f;
+    float altitudeScale = 3f;
+    float altitudeExponent = 1.7f;
     float temperatureScale = 2f;
-    float temperatureExponent = 2f;
+    float temperatureExponent = 1.7f;
 
     bool generatePrecipitationMap = true;
     bool generateAltitudeMap = true;
     bool generateTemperatureMap = true;
+    bool generateRivers = false;
     //bool warmPoles = false;
 
     public override void OnInspectorGUI()
@@ -36,6 +37,7 @@ public class HexGridInspector : Editor
         generatePrecipitationMap = EditorGUILayout.Toggle("Precipitation map", generatePrecipitationMap);
         generateAltitudeMap = EditorGUILayout.Toggle("Altitude map", generateAltitudeMap);
         generateTemperatureMap = EditorGUILayout.Toggle("Temperature map", generateTemperatureMap);
+        generateRivers = EditorGUILayout.Toggle("Generate Rivers", generateRivers);
         //warmPoles = EditorGUILayout.Toggle("Warm poles", warmPoles);
 
         if (GUILayout.Button("Generate Grid"))
@@ -81,9 +83,9 @@ public class HexGridInspector : Editor
                 } 
                 catch (NullReferenceException)
                 {
-                    generateTemperatureMap = false;
-                    temperatureMap = null;
-                    UnityEngine.Debug.Log("Need to generate altitude map for temperature map generation");
+                    //generateTemperatureMap = false;
+                    //temperatureMap = null;
+                    UnityEngine.Debug.Log("No altitude map generated, skipping temperature refinement pass");
                 }
             }
 
@@ -104,7 +106,7 @@ public class HexGridInspector : Editor
                 }
                 else
                 {
-                    if (altitude < 0.2f)
+                    if (altitude < 0.175f && generateAltitudeMap) // water level, might need tweaking
                     {
                         tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0, 0.7f, 0.9f);
                     }
@@ -124,13 +126,16 @@ public class HexGridInspector : Editor
                 */
             }
 
-            MapGeneration.GenerateRivers(grid, altitudeMap, 10);
-            foreach (List<HexTile> river in grid.rivers)
+            if (generateRivers)
             {
-                for (int i = 0; i < river.Count; i++) 
+                MapGeneration.GenerateRivers(grid);
+                foreach (List<HexTile> river in grid.rivers)
                 {
-                    float blueShade = Mathf.Lerp(0f, 1f, 1 - ((float) i / river.Count));
-                    river[i].GetComponentInChildren<MeshRenderer>().material.color = new Color(0, 0, blueShade);
+                    for (int i = 0; i < river.Count; i++)
+                    {
+                        float blueShade = Mathf.Lerp(0f, 1f, 1 - ((float)i / river.Count));
+                        river[i].GetComponentInChildren<MeshRenderer>().material.color = new Color(0, 0, blueShade);
+                    }
                 }
             }
 

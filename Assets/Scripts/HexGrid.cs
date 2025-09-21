@@ -19,7 +19,7 @@ public class HexGrid : MonoBehaviour
     Mesh hexMesh = null;
 
     public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
-    public List<HexTile>[] rivers;
+    public List<List<HexTile>> rivers;
 
 
     public void Initialize()
@@ -65,6 +65,11 @@ public class HexGrid : MonoBehaviour
         {
             throw new ArgumentException("No tile found at coordinates " + key.ToString());
         }
+    }
+
+    public HexTile[] GetTiles()
+    {
+        return tiles.Values.ToArray();
     }
 
     private void HandleInput()
