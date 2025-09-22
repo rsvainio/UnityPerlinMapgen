@@ -27,9 +27,8 @@ public static class MapGeneration
         temperatureMap = GenerateNoiseMap(grid, scale: 2f, exponent: 2f);
         temperatureMap = TemperatureRefinementPass(grid, temperatureMap, altitudeMap);
 
-
         //probably will need to be rewritten
-        foreach (HexTile tile in grid.tiles.Values)
+        foreach (HexTile tile in grid.GetTiles())
         {
             (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
             float precipitation = precipitationMap[coordinates];
@@ -50,9 +49,9 @@ public static class MapGeneration
         int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
-        //offsetQShared = offsetRShared = 0f;
+        //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
         
-        foreach (HexTile tile in grid.tiles.Values)
+        foreach (HexTile tile in grid.GetTiles())
         {
             HexCoordinates coordinates = tile.GetCoordinates();
             float qn = (coordinates.q + coordinateOffset) / (float) grid.width * scale;
@@ -117,11 +116,27 @@ public static class MapGeneration
 
     public static void GenerateTerrainFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
     {
-        //GenerateMountains(grid)
+        //GenerateElevationFeatures(grid, altitudeMap);
         GenerateRivers(grid);
-        //GenerateForests(grid)
+        //GenerateForests(grid);
     }
 
+    public static void GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
+    {
+        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: 1.5f, exponent: 0.5f); // these values might need to be tweaked
+        foreach (KeyValuePair<(int, int, int), float> entry in mountainMask) 
+        {
+            float tileMountainMask = Mathf.Abs(entry.Value * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
+            float newAltitude = Mathf.Clamp01(altitudeMap[entry.Key] + tileMountainMask * mountainPronunciation * altitudeMap[entry.Key]);
+            altitudeMap[entry.Key] = newAltitude;
+        }
+
+        // add post-processing to remove lone peaks and potentially simulate tectonic bands
+    }
+
+    // altitude seems to be the biggest obstacle for river source candidate spots being found
+    // might be fixed after elevation feature generation is implemented
+    // the pathfinding for rivers is probably quite naive, should try and implement something else
     public static void GenerateRivers(HexGrid grid, float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
         List<HexTile> riverSourceCandidates = grid.GetTiles().Where(t => t.GetAltitude() >= minAltitude

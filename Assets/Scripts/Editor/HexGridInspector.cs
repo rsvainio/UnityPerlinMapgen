@@ -17,6 +17,7 @@ public class HexGridInspector : Editor
     bool generateAltitudeMap = true;
     bool generateTemperatureMap = true;
     bool generateRivers = false;
+    bool generateElevationFeatures = false;
     //bool warmPoles = false;
 
     public override void OnInspectorGUI()
@@ -38,6 +39,7 @@ public class HexGridInspector : Editor
         generateAltitudeMap = EditorGUILayout.Toggle("Altitude map", generateAltitudeMap);
         generateTemperatureMap = EditorGUILayout.Toggle("Temperature map", generateTemperatureMap);
         generateRivers = EditorGUILayout.Toggle("Generate Rivers", generateRivers);
+        generateElevationFeatures = EditorGUILayout.Toggle("Generate Elevation Features", generateElevationFeatures);
         //warmPoles = EditorGUILayout.Toggle("Warm poles", warmPoles);
 
         if (GUILayout.Button("Generate Grid"))
@@ -89,6 +91,8 @@ public class HexGridInspector : Editor
                 }
             }
 
+            if (generateElevationFeatures) { MapGeneration.GenerateElevationFeatures(grid, altitudeMap); }
+
             foreach (HexTile tile in grid.tiles.Values)
             {
                 (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
@@ -102,17 +106,33 @@ public class HexGridInspector : Editor
 
                 if (precipitation > 1f || altitude > 1f || temperature > 1f) // tiles that break the 0 - 1 normalization are coloured pure white
                 {
-                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(255, 255, 255);
+                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
                 }
                 else
                 {
                     if (altitude < 0.175f && generateAltitudeMap) // water level, might need tweaking
                     {
-                        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0, 0.7f, 0.9f);
+                        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0f, 0.7f, 0.9f);
+                    }
+                    else if (altitude >= 0.55f && generateAltitudeMap)
+                    {
+                        if (altitude >= 0.9f && generateAltitudeMap)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                        }
+                        else if (altitude >= 0.7f && generateAltitudeMap)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                        }
+                        else
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                        }
                     }
                     else
                     {
                         tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, precipitation);
+                        //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, altitude, 0f);
                     }
                 }
 
