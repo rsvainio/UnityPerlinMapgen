@@ -39,12 +39,6 @@ public class HexGrid : MonoBehaviour
         tiles.Clear();
         GenerateGrid();
     }
-
-    public void GenerateNoiseMaps(float scale = 1f, float exponent = 2f)
-    {
-        MapGeneration.GenerateNoiseMap(this, scale, exponent);
-    }
-
     
     private void Update()
     {

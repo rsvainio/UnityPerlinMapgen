@@ -10,6 +10,7 @@ public class HexGridInspector : Editor
     float precipitationExponent = 2f;
     float altitudeScale = 3f;
     float altitudeExponent = 1.7f;
+    int altitudeAmplitudes = 4;
     float temperatureScale = 2f;
     float temperatureExponent = 1.7f;
 
@@ -22,7 +23,7 @@ public class HexGridInspector : Editor
 
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        DrawDefaultInspector();        
         HexGrid grid = (HexGrid)target;
 
         precipitationScale = EditorGUILayout.Slider("Precipitation scale", precipitationScale, 1f, 10f);
@@ -30,6 +31,7 @@ public class HexGridInspector : Editor
 
         altitudeScale = EditorGUILayout.Slider("Altitude scale", altitudeScale, 1f, 10f);
         altitudeExponent = EditorGUILayout.Slider("Altitude exponent", altitudeExponent, 0.1f, 5f);
+        altitudeAmplitudes = EditorGUILayout.IntSlider("Altitude amplitudes", altitudeAmplitudes, 1, 10);
 
         temperatureScale = EditorGUILayout.Slider("Temperature scale", temperatureScale, 1f, 10f);
         temperatureExponent = EditorGUILayout.Slider("Temperature exponent", temperatureExponent, 0.1f, 5f);
@@ -75,10 +77,11 @@ public class HexGridInspector : Editor
         {
             Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
             precipitationMap = altitudeMap = temperatureMap = null;
-            if (generatePrecipitationMap)   { precipitationMap = MapGeneration.GenerateNoiseMap(grid, scale: this.precipitationScale, exponent: this.precipitationExponent); }
-            if (generateAltitudeMap)        { altitudeMap = MapGeneration.GenerateNoiseMap(grid, scale: this.altitudeScale, exponent: this.altitudeExponent); }
+            if (generatePrecipitationMap)   { precipitationMap = MapGeneration.GeneratePrecipitationMap(grid, scale: this.precipitationScale, exponent: this.precipitationExponent); }
+            if (generateAltitudeMap)        { altitudeMap = MapGeneration.GenerateAltitudeMap(grid, scale: this.altitudeScale, exponent: this.altitudeExponent,
+                                              amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures); }
             if (generateTemperatureMap) {
-                temperatureMap = MapGeneration.GenerateNoiseMap(grid, scale: this.temperatureScale, exponent: this.temperatureExponent);
+                temperatureMap = MapGeneration.GenerateTemperatureMap(grid, scale: this.temperatureScale, exponent: this.temperatureExponent);
                 try
                 {
                     temperatureMap = MapGeneration.TemperatureRefinementPass(grid, temperatureMap, altitudeMap);
@@ -114,13 +117,13 @@ public class HexGridInspector : Editor
                     {
                         tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0f, 0.7f, 0.9f);
                     }
-                    else if (altitude >= 0.55f && generateAltitudeMap)
+                    else if (altitude >= 0.7f && generateAltitudeMap)
                     {
                         if (altitude >= 0.9f && generateAltitudeMap)
                         {
                             tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
                         }
-                        else if (altitude >= 0.7f && generateAltitudeMap)
+                        else if (altitude >= 0.8f && generateAltitudeMap)
                         {
                             tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
                         }

@@ -40,17 +40,54 @@ public static class MapGeneration
         GenerateTerrainFeatures(grid, altitudeMap);
     }
 
+    public static Dictionary<(int, int, int), float> GeneratePrecipitationMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
+    {
+        return GenerateNoiseMap(grid, scale, exponent);
+    }
+
+    // move mountain generation to be done here as well, since altitude is used to modulate temperature
+    // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
+    public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
+    {
+        //return GenerateNoiseMap(grid, scale, exponent, amplitudeCount);
+
+        Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
+        Dictionary<(int, int, int), float> altitudeUpperBound = GenerateNoiseMap(grid, scale * 3, exponent * 1.5f, amplitudeCount);
+        Dictionary<(int, int, int), float> altitudeLerpValue = GenerateNoiseMap(grid, scale: 2f, exponent: 1f, amplitudeCount: 1);
+
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeLerpValue)
+        {
+            (int, int, int) key = entry.Key;
+            float lowerBound = altitudeMap[key], upperBound = altitudeUpperBound[key];
+            altitudeMap[key] = Mathf.Lerp(lowerBound, upperBound, entry.Value);
+        }
+
+        if (generateElevationFeatures)
+        {
+            altitudeMap = GenerateElevationFeatures(grid, altitudeMap);
+        }
+
+        return altitudeMap;
+    }
+
+    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
+    {
+        return GenerateNoiseMap(grid, scale, exponent);
+    }
+
     //map generation presets could potentially be expressed as these parameter values
     //i.e. a flatlands map would have a high exponent with low scale
-    public static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, float fudgeFactor = 1.2f, bool useSimplex = false)
+    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool useSimplex = false)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
-        float[] amplitudes = {1f, 1f/2f, 1f/4f, 1/8f};
+        float[] amplitudes = new float[amplitudeCount];
+        for (int i = 0; i < amplitudeCount; i++) { amplitudes[i] = 1f / Mathf.Pow(2, i); }
+
         int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
         //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
-        
+
         foreach (HexTile tile in grid.GetTiles())
         {
             HexCoordinates coordinates = tile.GetCoordinates();
@@ -121,16 +158,19 @@ public static class MapGeneration
         //GenerateForests(grid);
     }
 
-    public static void GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
+    // should try replacing the mountainPronunciation constant with an additional layer of noise,
+    // which could potentially be stretched in one dimension to create bands resulting in mountain ranges
+    public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
     {
-        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: 1.5f, exponent: 0.5f); // these values might need to be tweaked
-        foreach (KeyValuePair<(int, int, int), float> entry in mountainMask) 
+        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
-            float tileMountainMask = Mathf.Abs(entry.Value * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
-            float newAltitude = Mathf.Clamp01(altitudeMap[entry.Key] + tileMountainMask * mountainPronunciation * altitudeMap[entry.Key]);
-            altitudeMap[entry.Key] = newAltitude;
+            float tileMountainMask = 1f - Mathf.Abs(mountainMask[entry.Key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
+            float newAltitude = Mathf.Clamp01(entry.Value + tileMountainMask * mountainPronunciation * entry.Value);
+            mountainMask[entry.Key] = newAltitude;
         }
 
+        return mountainMask;
         // add post-processing to remove lone peaks and potentially simulate tectonic bands
     }
 
