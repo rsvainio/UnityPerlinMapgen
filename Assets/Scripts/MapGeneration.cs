@@ -83,7 +83,7 @@ public static class MapGeneration
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
-        for (int i = 0; i < amplitudeCount; i++) { amplitudes[i] = 1f / Mathf.Pow(2, i); }
+        for (int i = 0; i < amplitudeCount; i++) { amplitudes[i] = 1f / Mathf.Pow(3, i); }
 
         int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
         float offsetQShared = Random.Range(0f, 100f);
@@ -174,15 +174,13 @@ public static class MapGeneration
         }
 
         return mountainMask;
-        // add post-processing to remove lone peaks and potentially simulate tectonic bands
+        // TODO: add post-processing to remove lone peaks and potentially simulate tectonic bands
         // also possibly to have another pass where individual tiles surrounded by water are pushed down or consolidated to form islands
     }
 
     public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
     {
-        Dictionary<(int, int, int), float> newAltitudeMap = new Dictionary<(int, int, int), float>();
-        //float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
-
+        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(grid);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             int qCoord = entry.Key.Item1;
@@ -193,11 +191,13 @@ public static class MapGeneration
             float yDistance = Mathf.Abs(rCoord - sCoord) / 2f;
             yDistance = 2 * yDistance / grid.height;
 
-            float elevation = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f);
-            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 3f);
-            elevation = Mathf.Lerp(altitudeMap[entry.Key], elevation, mixValue);
-
-            newAltitudeMap[entry.Key] = elevation;
+            float shaping = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f); // https://www.wolframalpha.com/input?i=plot+sin%28x*pi%29sin%28y*pi%29%5E4+from+0+to+1
+            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 2f);
+            mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
+            mixValue *= Mathf.Lerp(0.8f, 1.2f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
+            shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
+            //shaping *= Mathf.Lerp(0.8f, 1.2f, newAltitudeMap[entry.Key]);
+            newAltitudeMap[entry.Key] = shaping;
         }
 
         return newAltitudeMap;
