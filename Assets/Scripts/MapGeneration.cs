@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.SocialPlatforms.Impl;
+using static UnityEngine.EventSystems.EventTrigger;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -67,7 +69,7 @@ public static class MapGeneration
             altitudeMap = GenerateElevationFeatures(grid, altitudeMap);
         }
 
-        return altitudeMap;
+        return GenerateWaterBoundary(grid, altitudeMap);
     }
 
     public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
@@ -154,6 +156,7 @@ public static class MapGeneration
     public static void GenerateTerrainFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
     {
         //GenerateElevationFeatures(grid, altitudeMap);
+        GenerateWaterBoundary(grid, altitudeMap);
         GenerateRivers(grid);
         //GenerateForests(grid);
     }
@@ -172,6 +175,32 @@ public static class MapGeneration
 
         return mountainMask;
         // add post-processing to remove lone peaks and potentially simulate tectonic bands
+        // also possibly to have another pass where individual tiles surrounded by water are pushed down or consolidated to form islands
+    }
+
+    public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
+    {
+        Dictionary<(int, int, int), float> newAltitudeMap = new Dictionary<(int, int, int), float>();
+        //float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
+
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            int qCoord = entry.Key.Item1;
+            int rCoord = entry.Key.Item2;
+            int sCoord = entry.Key.Item3;
+            float xDistance = Mathf.Abs(qCoord - (rCoord + sCoord)) / 2f;
+            xDistance = 2 * xDistance / grid.width;
+            float yDistance = Mathf.Abs(rCoord - sCoord) / 2f;
+            yDistance = 2 * yDistance / grid.height;
+
+            float elevation = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f);
+            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 3f);
+            elevation = Mathf.Lerp(altitudeMap[entry.Key], elevation, mixValue);
+
+            newAltitudeMap[entry.Key] = elevation;
+        }
+
+        return newAltitudeMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
