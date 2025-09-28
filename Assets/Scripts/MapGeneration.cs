@@ -51,7 +51,7 @@ public static class MapGeneration
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
     public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
     {
-        //return GenerateNoiseMap(grid, scale, exponent, amplitudeCount);
+        //return GenerateNoiseMap(grid, 45f, 0.5f, 2f, scale: 4f);
 
         Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
         Dictionary<(int, int, int), float> altitudeUpperBound = GenerateNoiseMap(grid, scale * 3, exponent * 1.5f, amplitudeCount);
@@ -72,14 +72,14 @@ public static class MapGeneration
         return GenerateWaterBoundary(grid, altitudeMap);
     }
 
-    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
+    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         return GenerateNoiseMap(grid, scale, exponent);
     }
 
     //map generation presets could potentially be expressed as these parameter values
     //i.e. a flatlands map would have a high exponent with low scale
-    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool useSimplex = false)
+    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
@@ -105,19 +105,54 @@ public static class MapGeneration
                 float coordX = (qn * (1f / amplitude)) + offsetQ + offsetQShared;
                 float coordY = (rn * (1f / amplitude)) + offsetR + offsetRShared;
 
-                if (useSimplex)
-                {
-                    //simplex
-                    var noiseCoords = new Unity.Mathematics.float2(coordX, coordY);
-                    sample += amplitude * Unity.Mathematics.noise.snoise(noiseCoords);
-                } 
-                else
-                {
-                    //perlin
-                    sample += amplitude * Mathf.PerlinNoise(coordX, coordY);
-                }               
+                sample += amplitude * Mathf.PerlinNoise(coordX, coordY);          
             }
 
+            float fudgeFactor = 1.2f;
+            sample /= (amplitudes.Sum() * fudgeFactor);             //normalize the values to a 0.0 - 1.0 range
+            sample = Mathf.Pow(sample * fudgeFactor, exponent);     //raise the sample value to the power of exponent to make the noise values less linear
+            noiseMap.Add(coordinates.ToTuple(), sample);
+        }
+
+        return noiseMap;
+    }
+
+    // currently the noisemaps generated are rotated counter-clockwise by the angle instead of clockwise
+    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float angle, float xScale, float yScale, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    {
+        Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
+        float[] amplitudes = new float[amplitudeCount];
+        for (int i = 0; i < amplitudeCount; i++) { amplitudes[i] = 1f / Mathf.Pow(3, i); }
+
+        int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
+        float offsetQShared = Random.Range(0f, 100f);
+        float offsetRShared = Random.Range(0f, 100f);
+        //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
+
+        angle = (Mathf.PI * 180f) / angle;
+        float sin = Mathf.Sin(angle);
+        float cos = Mathf.Cos(angle);
+        Debug.Log($"{angle} {sin} {cos}");
+
+        foreach (HexTile tile in grid.GetTiles())
+        {
+            HexCoordinates coordinates = tile.GetCoordinates();
+            float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
+            float rn = (coordinates.r + coordinateOffset) / (float)grid.height * scale;
+            float sample = 0f;
+
+            //a separate pass for each of the amplitudes
+            foreach (float amplitude in amplitudes)
+            {
+                float offsetQ = Random.Range(0f, 0.3f / amplitude);
+                float offsetR = Random.Range(0f, 0.3f / amplitude);
+                float coordX = ((qn * cos - rn * sin) * (1f / amplitude)) + offsetQ + offsetQShared;
+                float coordY = ((qn * sin + rn * cos) * (1f / amplitude)) + offsetR + offsetRShared;
+
+                sample += amplitude * Mathf.PerlinNoise(coordX * xScale, coordY * yScale);
+            }
+
+            float fudgeFactor = 1.2f;
             sample /= (amplitudes.Sum() * fudgeFactor);             //normalize the values to a 0.0 - 1.0 range
             sample = Mathf.Pow(sample * fudgeFactor, exponent);     //raise the sample value to the power of exponent to make the noise values less linear
             noiseMap.Add(coordinates.ToTuple(), sample);
@@ -180,7 +215,7 @@ public static class MapGeneration
 
     public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
     {
-        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(grid);
+        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(grid, scale: 8f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             int qCoord = entry.Key.Item1;
@@ -194,7 +229,7 @@ public static class MapGeneration
             float shaping = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f); // https://www.wolframalpha.com/input?i=plot+sin%28x*pi%29sin%28y*pi%29%5E4+from+0+to+1
             float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 2f);
             mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
-            mixValue *= Mathf.Lerp(0.8f, 1.2f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
+            mixValue *= Mathf.Lerp(0.75f, 1.25f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
             shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
             //shaping *= Mathf.Lerp(0.8f, 1.2f, newAltitudeMap[entry.Key]);
             newAltitudeMap[entry.Key] = shaping;
