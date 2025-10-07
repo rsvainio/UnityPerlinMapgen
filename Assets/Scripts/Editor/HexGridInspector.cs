@@ -31,6 +31,8 @@ public class HexGridInspector : Editor
     int mountainAngle = 90;
     int mountainRangeCount = 1;
 
+    bool singleColor = true;
+
     public override void OnInspectorGUI()
     {
         DrawDefaultInspector();        
@@ -173,10 +175,12 @@ public class HexGridInspector : Editor
         if (mountainGenerationFoldout)
         {
             mountainScale = EditorGUILayout.Slider("Mountain scale", mountainScale, 1f, 10f);
-            mountainXScale = EditorGUILayout.Slider("Mountain X scale", mountainScale, 0.1f, 10f);
-            mountainYScale = EditorGUILayout.Slider("Mountain Y scale", mountainScale, 0.1f, 10f);
+            mountainXScale = EditorGUILayout.Slider("Mountain X scale", mountainXScale, 0.1f, 10f);
+            mountainYScale = EditorGUILayout.Slider("Mountain Y scale", mountainYScale, 0.1f, 10f);
             mountainAngle = EditorGUILayout.IntSlider("Mountain angle", mountainAngle, 1, 360);
-            mountainRangeCount = EditorGUILayout.IntSlider("Mountain range count", mountainRangeCount, 1, 10);
+            mountainRangeCount = EditorGUILayout.IntSlider("Mountain range count", mountainRangeCount, 1, 5);
+
+            singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
 
             if (GUILayout.Button("Generate Grid")) { generatedGrid(grid); }
 
@@ -185,10 +189,12 @@ public class HexGridInspector : Editor
             if (GUILayout.Button("Generate Mountains"))
             {
                 HexTile[] tiles = grid.GetTiles();
+                Color[] mountainRangeColors = {Color.green, Color.red, Color.blue, Color.yellow, Color.purple};
 
                 for(int i = 0; i < mountainRangeCount; i++)
                 {
                     float angle = mountainAngle * (i + 1); // makes following mountain ranges rotate relative to the initial mountain range
+                    Debug.Log(angle);
                     Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid: grid, angle: angle, xScale: mountainXScale, yScale: mountainYScale);
 
                     foreach (HexTile tile in tiles)
@@ -196,45 +202,55 @@ public class HexGridInspector : Editor
                         (int, int, int) key = tile.GetCoordinates().ToTuple();
                         float altitude = tile.GetAltitude();
                         altitude = Mathf.Max(altitude, mountainMask[key]);
-
                         tile.SetAltitude(altitude);
+
+                        if (singleColor)
+                        {
+                            if (altitude <= 0.175f) // water level, might need tweaking
+                            {
+                                Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
+                                tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
+                            }
+                            else if (altitude >= 0.7f)
+                            {
+                                if (altitude >= 0.9f)
+                                {
+                                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                                }
+                                else if (altitude >= 0.8f)
+                                {
+                                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                                }
+                                else
+                                {
+                                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                                }
+                            }
+                            else
+                            {
+                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0f, altitude, 0f);
+                            }
+                        } 
+                        else
+                        {
+                            if (i == 0)
+                            {
+                                Color newColor = Color.Lerp(Color.gray, mountainRangeColors[i], mountainMask[key]);
+                                tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", newColor);
+                            }
+                            else
+                            {
+                                Color currentColor = tile.GetComponentInChildren<Renderer>().material.GetColor("_Color");
+                                Color newColor = Color.Lerp(currentColor, mountainRangeColors[i], mountainMask[key]);
+                                tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", newColor);
+                            }
+                        }
                     }
                 }
 
                 foreach (HexTile tile in tiles)
                 {
-                    float altitude = tile.GetAltitude();
-                    if (altitude > 1f) // tiles that break the 0 - 1 normalization are coloured pure white
-                    {
-                        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                    }
-                    else
-                    {
-                        if (altitude <= 0.175f) // water level, might need tweaking
-                        {
-                            Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
-                        }
-                        else if (altitude >= 0.7f)
-                        {
-                            if (altitude >= 0.9f)
-                            {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                            }
-                            else if (altitude >= 0.8f)
-                            {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
-                            }
-                            else
-                            {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
-                            }
-                        }
-                        else
-                        {
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0f, altitude, 0f);
-                        }
-                    }
+                    tile.SetAltitude(0f);
                 }
             }
         }
