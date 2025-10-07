@@ -51,6 +51,18 @@ public static class MapGeneration
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
     public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
     {
+        Dictionary<(int, int, int), float> mountainMask = new Dictionary<(int, int, int), float>();
+        Dictionary<(int, int, int), float> xMountainMask = GenerateNoiseMap(grid, 45f, 3.5f, 0.7f, scale: 2f);
+        Dictionary<(int, int, int), float> yMountainMask = GenerateNoiseMap(grid, 135f, 4.5f, 0.8f, scale: 2f);
+
+        foreach (KeyValuePair<(int, int, int), float> entry in xMountainMask)
+        {
+            (int, int, int) key = entry.Key;
+            float tileMountainMask = Mathf.Max(xMountainMask[key], yMountainMask[key]);
+
+            mountainMask[key] = tileMountainMask;
+        }
+        return mountainMask;
         //return GenerateNoiseMap(grid, 45f, 0.5f, 2f, scale: 4f);
 
         Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
@@ -79,7 +91,7 @@ public static class MapGeneration
 
     //map generation presets could potentially be expressed as these parameter values
     //i.e. a flatlands map would have a high exponent with low scale
-    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    public static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
@@ -118,7 +130,7 @@ public static class MapGeneration
     }
 
     // currently the noisemaps generated are rotated counter-clockwise by the angle instead of clockwise
-    private static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float angle, float xScale, float yScale, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    public static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float angle, float xScale, float yScale, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
@@ -132,7 +144,6 @@ public static class MapGeneration
         angle = (Mathf.PI * 180f) / angle;
         float sin = Mathf.Sin(angle);
         float cos = Mathf.Cos(angle);
-        Debug.Log($"{angle} {sin} {cos}");
 
         foreach (HexTile tile in grid.GetTiles())
         {
@@ -200,6 +211,19 @@ public static class MapGeneration
     // which could potentially be stretched in one dimension to create bands resulting in mountain ranges
     public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
     {
+        Dictionary<(int, int, int), float> mountainMask = new Dictionary<(int, int, int), float>();
+        Dictionary<(int, int, int), float> xMountainMask = GenerateNoiseMap(grid, 45f, 2f, 0.5f);
+        Dictionary<(int, int, int), float> yMountainMask = GenerateNoiseMap(grid, 135f, 2f, 0.5f);
+
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            (int, int, int) key = entry.Key;
+            float tileMountainMask = Mathf.Max(xMountainMask[key], yMountainMask[key]);
+
+            mountainMask[key] = tileMountainMask;
+        }
+
+        /*
         Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
@@ -207,6 +231,7 @@ public static class MapGeneration
             float newAltitude = Mathf.Clamp01(entry.Value + tileMountainMask * mountainPronunciation * entry.Value);
             mountainMask[entry.Key] = newAltitude;
         }
+        */
 
         return mountainMask;
         // TODO: add post-processing to remove lone peaks and potentially simulate tectonic bands

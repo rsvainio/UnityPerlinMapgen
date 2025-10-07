@@ -25,8 +25,11 @@ public class HexTile : MonoBehaviour
     }
 
     public float GetPrecipitation() { return precipitation; }
+    public void SetPrecipitation(float precipitation) { this.precipitation = precipitation; }
     public float GetAltitude() { return altitude; }
+    public void SetAltitude(float altitude) { this.altitude = altitude; }
     public float GetTemperature() { return temperature; }
+    public void SetTemperature(float temperature) { this.temperature = temperature; } 
 
     public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
     {
