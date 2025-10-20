@@ -9,6 +9,8 @@ public class HexGridInspector : Editor
     bool mapGenerationFoldout = true;
     bool mountainGenerationFoldout = false;
 
+    int customSeed = 0;
+
     // map generation parameters
     float precipitationScale = 2f;
     float precipitationExponent = 2f;
@@ -39,6 +41,8 @@ public class HexGridInspector : Editor
         DrawDefaultInspector();        
         HexGrid grid = (HexGrid)target;
 
+        customSeed = EditorGUILayout.IntField("Custom seed", customSeed);
+
         mapGenerationFoldout = EditorGUILayout.Foldout(mapGenerationFoldout, "Map Generation", true);
         if (mapGenerationFoldout)
         {
@@ -66,6 +70,8 @@ public class HexGridInspector : Editor
 
             if (GUILayout.Button("Generate Noisemaps"))
             {
+                if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
+
                 Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
                 precipitationMap = altitudeMap = temperatureMap = null;
                 if (generatePrecipitationMap) { precipitationMap = MapGeneration.GeneratePrecipitationMap(grid, scale: this.precipitationScale, exponent: this.precipitationExponent); }
@@ -188,6 +194,8 @@ public class HexGridInspector : Editor
 
             if (GUILayout.Button("Generate Mountains"))
             {
+                if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
+
                 HexTile[] tiles = grid.GetTiles();
                 Color[] mountainRangeColors = {Color.green, Color.red, Color.blue, Color.yellow, Color.purple};
 

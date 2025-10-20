@@ -83,7 +83,6 @@ public static class MapGeneration
         int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
-        //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
 
         foreach (HexTile tile in grid.GetTiles())
         {
@@ -122,7 +121,6 @@ public static class MapGeneration
         int coordinateOffset = Mathf.CeilToInt(Mathf.Sqrt(Mathf.Pow(grid.height, 2f) + Mathf.Pow(grid.width, 2f)) / 2f); // this ensures that the coordinates stay positive without them mirroring through absolute
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
-        //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
 
         //angle = (Mathf.PI * 180f) / angle;
         angle *= Mathf.Deg2Rad;
@@ -295,7 +293,6 @@ public static class MapGeneration
         riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.GetAltitude()).ToList(); // sort the list of candidates by altitude
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
-        System.Random rand = new System.Random();
 
         /*
         // Debug.Log(riverStartingPointCandidates.Count);
@@ -310,7 +307,7 @@ public static class MapGeneration
         foreach (HexTile tile in riverSourceCandidates)
         {
             float weight = tile.GetPrecipitation() * tile.GetAltitude();
-            if (rand.NextDouble() > weight) { continue; }
+            if (Random.value > weight) { continue; }
 
             List<HexTile> newRiver = RiverRecursion(tile);
             rivers.Add(newRiver);
