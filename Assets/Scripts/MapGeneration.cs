@@ -51,20 +51,6 @@ public static class MapGeneration
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
     public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
     {
-        Dictionary<(int, int, int), float> mountainMask = new Dictionary<(int, int, int), float>();
-        Dictionary<(int, int, int), float> xMountainMask = GenerateNoiseMap(grid, 45f, 3.5f, 0.7f, scale: 2f);
-        Dictionary<(int, int, int), float> yMountainMask = GenerateNoiseMap(grid, 135f, 4.5f, 0.8f, scale: 2f);
-
-        foreach (KeyValuePair<(int, int, int), float> entry in xMountainMask)
-        {
-            (int, int, int) key = entry.Key;
-            float tileMountainMask = Mathf.Max(xMountainMask[key], yMountainMask[key]);
-
-            mountainMask[key] = tileMountainMask;
-        }
-        return mountainMask;
-        //return GenerateNoiseMap(grid, 45f, 0.5f, 2f, scale: 4f);
-
         Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
         Dictionary<(int, int, int), float> altitudeUpperBound = GenerateNoiseMap(grid, scale * 3, exponent * 1.5f, amplitudeCount);
         Dictionary<(int, int, int), float> altitudeLerpValue = GenerateNoiseMap(grid, scale: 2f, exponent: 1f, amplitudeCount: 1);
@@ -141,7 +127,8 @@ public static class MapGeneration
         float offsetRShared = Random.Range(0f, 100f);
         //offsetQShared = offsetRShared = 0f; // in case consistent generation is required
 
-        angle = (Mathf.PI * 180f) / angle;
+        //angle = (Mathf.PI * 180f) / angle;
+        angle *= Mathf.Deg2Rad;
         float sin = Mathf.Sin(angle);
         float cos = Mathf.Cos(angle);
 
@@ -157,6 +144,8 @@ public static class MapGeneration
             {
                 float offsetQ = Random.Range(0f, 0.3f / amplitude);
                 float offsetR = Random.Range(0f, 0.3f / amplitude);
+                //float coordX = ((qn * cos - rn * sin) * (1f / amplitude)) + offsetQ + offsetQShared;
+                //float coordY = ((qn * sin + rn * cos) * (1f / amplitude)) + offsetR + offsetRShared;
                 float coordX = ((qn * cos - rn * sin) * (1f / amplitude)) + offsetQ + offsetQShared;
                 float coordY = ((qn * sin + rn * cos) * (1f / amplitude)) + offsetR + offsetRShared;
 
@@ -211,30 +200,28 @@ public static class MapGeneration
     // which could potentially be stretched in one dimension to create bands resulting in mountain ranges
     public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
     {
-        Dictionary<(int, int, int), float> mountainMask = new Dictionary<(int, int, int), float>();
-        Dictionary<(int, int, int), float> xMountainMask = GenerateNoiseMap(grid, 45f, 2f, 0.5f);
-        Dictionary<(int, int, int), float> yMountainMask = GenerateNoiseMap(grid, 135f, 2f, 0.5f);
-
+        Dictionary<(int, int, int), float> elevationMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             (int, int, int) key = entry.Key;
-            float tileMountainMask = Mathf.Max(xMountainMask[key], yMountainMask[key]);
-
-            mountainMask[key] = tileMountainMask;
+            float tileElevationMask = 1f - Mathf.Abs(elevationMask[key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
+            float newAltitude = Mathf.Clamp01(entry.Value + tileElevationMask * mountainPronunciation * entry.Value);
+            elevationMask[key] = newAltitude;
         }
 
-        /*
-        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
+        // mountain range generation
+        float angle = Random.Range(1f, 360f);
+        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, angle, 2f, 0.3f, exponent: 4f, scale: 4.5f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
-            float tileMountainMask = 1f - Mathf.Abs(mountainMask[entry.Key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
-            float newAltitude = Mathf.Clamp01(entry.Value + tileMountainMask * mountainPronunciation * entry.Value);
-            mountainMask[entry.Key] = newAltitude;
+            (int, int, int) key = entry.Key;
+            float tileMountainMask = mountainMask[key];
+            if (tileMountainMask < 0.5f) { continue; } // skip tiles that aren't high peaks
+            tileMountainMask = Mathf.Lerp(elevationMask[key], tileMountainMask + elevationMask[key], tileMountainMask);
+            elevationMask[key] = Mathf.Clamp01(tileMountainMask);
         }
-        */
 
-        return mountainMask;
-        // TODO: add post-processing to remove lone peaks and potentially simulate tectonic bands
+        return elevationMask;
         // also possibly to have another pass where individual tiles surrounded by water are pushed down or consolidated to form islands
     }
 
@@ -251,7 +238,7 @@ public static class MapGeneration
             float yDistance = Mathf.Abs(rCoord - sCoord) / 2f;
             yDistance = 2 * yDistance / grid.height;
 
-            float shaping = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f); // https://www.wolframalpha.com/input?i=plot+sin%28x*pi%29sin%28y*pi%29%5E4+from+0+to+1
+            float shaping = Mathf.Pow((Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2))), 4f); // https://www.wolframalpha.com/input?i=plot+%28sin%28x*pi%29sin%28y*pi%29%29%5E4+from+0+to+1
             float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 2f);
             mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
             mixValue *= Mathf.Lerp(0.75f, 1.25f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
@@ -297,7 +284,7 @@ public static class MapGeneration
         }
 
         Debug.Log($"Generated {rivers.Count} rivers from source candidates");
-        grid.rivers = rivers;
+        grid.rivers = rivers; // this is dumb and should be changed to return the rivers instead
     }
 
     // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima

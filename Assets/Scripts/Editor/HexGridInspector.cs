@@ -12,8 +12,8 @@ public class HexGridInspector : Editor
     // map generation parameters
     float precipitationScale = 2f;
     float precipitationExponent = 2f;
-    float altitudeScale = 5f;
-    float altitudeExponent = 1.7f;
+    float altitudeScale = 7f; // these values are tuned with elevation feature generation in mind
+    float altitudeExponent = 2f; // these values are tuned with elevation feature generation in mind
     int altitudeAmplitudes = 4;
     float temperatureScale = 2f;
     float temperatureExponent = 1.7f;
@@ -25,10 +25,11 @@ public class HexGridInspector : Editor
     bool generateElevationFeatures = false;
 
     // mountain generation parameters
-    float mountainScale = 2f;
-    float mountainXScale = 3.5f;
-    float mountainYScale = 0.8f;
+    float mountainScale = 4.5f;
+    float mountainXScale = 2f;
+    float mountainYScale = 0.3f;
     int mountainAngle = 90;
+    float mountainExponent = 4f;
     int mountainRangeCount = 1;
 
     bool singleColor = true;
@@ -88,8 +89,6 @@ public class HexGridInspector : Editor
                         UnityEngine.Debug.Log("No altitude map generated, skipping temperature refinement pass");
                     }
                 }
-
-                if (generateElevationFeatures) { MapGeneration.GenerateElevationFeatures(grid, altitudeMap); }
 
                 foreach (HexTile tile in grid.tiles.Values)
                 {
@@ -178,6 +177,7 @@ public class HexGridInspector : Editor
             mountainXScale = EditorGUILayout.Slider("Mountain X scale", mountainXScale, 0.1f, 10f);
             mountainYScale = EditorGUILayout.Slider("Mountain Y scale", mountainYScale, 0.1f, 10f);
             mountainAngle = EditorGUILayout.IntSlider("Mountain angle", mountainAngle, 1, 360);
+            mountainExponent = EditorGUILayout.Slider("Mountain exponent", mountainExponent, 0.1f, 4f);
             mountainRangeCount = EditorGUILayout.IntSlider("Mountain range count", mountainRangeCount, 1, 5);
 
             singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
@@ -194,8 +194,7 @@ public class HexGridInspector : Editor
                 for(int i = 0; i < mountainRangeCount; i++)
                 {
                     float angle = mountainAngle * (i + 1); // makes following mountain ranges rotate relative to the initial mountain range
-                    Debug.Log(angle);
-                    Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid: grid, angle: angle, xScale: mountainXScale, yScale: mountainYScale);
+                    Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid: grid, angle: angle, xScale: mountainXScale, yScale: mountainYScale, scale: mountainScale, exponent: mountainExponent);
 
                     foreach (HexTile tile in tiles)
                     {
@@ -206,12 +205,7 @@ public class HexGridInspector : Editor
 
                         if (singleColor)
                         {
-                            if (altitude <= 0.175f) // water level, might need tweaking
-                            {
-                                Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
-                            }
-                            else if (altitude >= 0.7f)
+                            if (altitude >= 0.7f)
                             {
                                 if (altitude >= 0.9f)
                                 {
@@ -228,7 +222,7 @@ public class HexGridInspector : Editor
                             }
                             else
                             {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0f, altitude, 0f);
+                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, 0f, altitude);
                             }
                         } 
                         else
