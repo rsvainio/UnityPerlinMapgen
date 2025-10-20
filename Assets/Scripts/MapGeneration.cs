@@ -1,9 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.SocialPlatforms.Impl;
-using static UnityEngine.EventSystems.EventTrigger;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -245,6 +242,42 @@ public static class MapGeneration
             shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
             //shaping *= Mathf.Lerp(0.8f, 1.2f, newAltitudeMap[entry.Key]);
             newAltitudeMap[entry.Key] = shaping;
+        }
+
+        // single cellular automata pass to remove some lone tiles surrounded by water and vice versa
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            (int, int, int) key = entry.Key;
+            HexTile tile = grid.FetchTile(key);
+
+            if (newAltitudeMap[key] > grid.waterLevel)
+            {
+                int neighborWaterTiles = 0;
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    float altitude = newAltitudeMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
+                }
+
+                if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
+                {
+                    newAltitudeMap[key] = grid.waterLevel;
+                }
+            }
+            else
+            {
+                int neighborLandTiles = 0;
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    float altitude = newAltitudeMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (altitude > grid.waterLevel) { neighborLandTiles++; }
+                }
+
+                if (neighborLandTiles > tile.GetNeighbors().Length - 1)
+                {
+                    newAltitudeMap[key] = grid.waterLevel + 0.05f;
+                }
+            }
         }
 
         return newAltitudeMap;

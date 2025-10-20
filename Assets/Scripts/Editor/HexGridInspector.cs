@@ -107,7 +107,7 @@ public class HexGridInspector : Editor
                     }
                     else
                     {
-                        if (altitude <= 0.175f && generateAltitudeMap) // water level, might need tweaking
+                        if (altitude <= grid.waterLevel && generateAltitudeMap) // water level, might need tweaking
                         {
                             Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
                             tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;

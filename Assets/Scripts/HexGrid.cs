@@ -20,7 +20,7 @@ public class HexGrid : MonoBehaviour
 
     public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
     public List<List<HexTile>> rivers;
-
+    public float waterLevel = 0.175f; // this will probably be moved elsewhere later
 
     public void Initialize()
     {
