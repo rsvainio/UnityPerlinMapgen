@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System;
+using Codice.Client.Common;
+using System.Linq;
 
 [CustomEditor(typeof(HexGrid))]
 public class HexGridInspector : Editor
@@ -35,6 +37,7 @@ public class HexGridInspector : Editor
     int mountainRangeCount = 1;
 
     bool singleColor = true;
+    bool averageElevationFeatures = false;
 
     public override void OnInspectorGUI()
     {
@@ -187,12 +190,13 @@ public class HexGridInspector : Editor
             mountainRangeCount = EditorGUILayout.IntSlider("Mountain range count", mountainRangeCount, 1, 5);
 
             singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
+            averageElevationFeatures = EditorGUILayout.Toggle("Elevation features by average", averageElevationFeatures);
 
             if (GUILayout.Button("Generate Grid")) { generatedGrid(grid); }
 
             if (GUILayout.Button("Clear Grid")) { clearGrid(grid); }
 
-            if (GUILayout.Button("Generate Mountains"))
+            if (GUILayout.Button("Generate Mountain Ranges"))
             {
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
@@ -253,6 +257,66 @@ public class HexGridInspector : Editor
                 foreach (HexTile tile in tiles)
                 {
                     tile.SetAltitude(0f);
+                }
+            }
+
+            if (GUILayout.Button("Generate Elevation Features"))
+            {
+                if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
+
+                Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+                for (int i = 0; i < mountainRangeCount - 1; i++)
+                {
+                    Debug.Log($"Generating mountain range {i}");
+                    Dictionary<(int, int, int), float> newMountainMask = MapGeneration.GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+                    foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
+                    {
+                        (int, int, int) key = entry.Key;
+                        if (averageElevationFeatures)
+                        { 
+                            float tileElevationMask = Mathf.Abs(entry.Value * 2 - 1.0f);
+                            mountainMask[key] += tileElevationMask;
+                        }
+                        else
+                        {
+                            float tileElevationMask = Mathf.Min(mountainMask[key], Mathf.Abs(entry.Value * 2 - 1.0f));
+                            mountainMask[key] = tileElevationMask;
+                        }
+                    }
+                }
+
+                foreach ((int, int, int) key in mountainMask.Keys.ToList())
+                {
+                    if (averageElevationFeatures)
+                    {
+                        mountainMask[key] = mountainMask[key] > 0.75f ? mountainMask[key] /= mountainRangeCount : 0f;
+                    }
+                    else if (mountainMask[key] < 0.75f)
+                    {
+                        mountainMask[key] = 0f;
+                    }
+
+                    HexTile tile = grid.FetchTile(key);
+                    float altitude = mountainMask[key];
+                    if (altitude >= 0.7f)
+                    {
+                        if (altitude >= 0.9f)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                        }
+                        else if (altitude >= 0.8f)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                        }
+                        else
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                        }
+                    }
+                    else
+                    {
+                        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, 0f, altitude);
+                    }
                 }
             }
         }
