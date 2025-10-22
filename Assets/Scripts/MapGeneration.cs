@@ -69,7 +69,8 @@ public static class MapGeneration
         }
 
         altitudeMap = GenerateWaterBoundary(grid, altitudeMap);
-        altitudeMap = cellularAutomataPass(grid, altitudeMap);
+        altitudeMap = cellularAutomataPass(grid, altitudeMap, grid.waterLevel);
+        altitudeMap = cellularAutomataPass(grid, altitudeMap, grid.waterLevel, neighborTilesForTransition: 5, lowerThanBoundary: false);
 
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
@@ -322,55 +323,114 @@ public static class MapGeneration
 
     //    }
     //}
-    
-    private static Dictionary<(int, int, int), float> cellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
-    {
-        Dictionary<(int, int, int), float> newAltitudeMap = new Dictionary<(int, int, int), float>();
 
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+    private static Dictionary<(int, int, int), float> cellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, bool lowerThanBoundary = true)
+    {
+        Dictionary<(int, int, int), float> newNoiseMap = new Dictionary<(int, int, int), float>();
+
+        foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
         {
             (int, int, int) key = entry.Key;
             HexTile tile = grid.FetchTile(key);
 
-            if (altitudeMap[key] > grid.waterLevel)
+            int neighborBoundaryTiles = 0;
+            float newValue = 0f;
+            if (noiseMap[key] > boundary && !lowerThanBoundary)
             {
-                int neighborWaterTiles = 0;
                 foreach (HexTile neighborTile in tile.GetNeighbors())
                 {
-                    float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
+                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (value <= boundary) 
+                    {
+                        neighborBoundaryTiles++;
+                        newValue += value;
+                    }
                 }
 
-                if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
+                int neighborTileReq = tile.GetNeighbors().Length == 6 ? neighborTilesForTransition : (int) Mathf.Round(neighborTilesForTransition / 6f * tile.GetNeighbors().Length);
+                if (neighborBoundaryTiles > neighborTileReq)
                 {
-                    newAltitudeMap[key] = grid.waterLevel;
+                    newValue /= neighborBoundaryTiles;
+                    newNoiseMap[key] = newValue;
                 }
                 else
                 {
-                    newAltitudeMap[key] = altitudeMap[key];
+                    newNoiseMap[key] = noiseMap[key];
+                }
+            }
+            else if (noiseMap[key] <= boundary && lowerThanBoundary)
+            {
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (value > boundary)
+                    {
+                        neighborBoundaryTiles++;
+                        newValue += value;
+                    }
+                }
+
+                int neighborTileReq = tile.GetNeighbors().Length == 6 ? neighborTilesForTransition : (int) Mathf.Round(neighborTilesForTransition / 6f * tile.GetNeighbors().Length);
+                if (neighborBoundaryTiles > neighborTileReq)
+                {
+                    newValue /= neighborBoundaryTiles;
+                    newNoiseMap[key] = boundary + 0.05f;
+                }
+                else
+                {
+                    newNoiseMap[key] = noiseMap[key];
                 }
             }
             else
             {
-                int neighborLandTiles = 0;
-                foreach (HexTile neighborTile in tile.GetNeighbors())
-                {
-                    float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (altitude > grid.waterLevel) { neighborLandTiles++; }
-                }
-
-                if (neighborLandTiles > tile.GetNeighbors().Length - 1)
-                {
-                    newAltitudeMap[key] = grid.waterLevel + 0.05f;
-                }
-                else
-                {
-                    newAltitudeMap[key] = altitudeMap[key];
-                }
+                newNoiseMap[key] = noiseMap[key];
             }
         }
 
-        return newAltitudeMap;
+        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        //{
+        //    (int, int, int) key = entry.Key;
+        //    HexTile tile = grid.FetchTile(key);
+
+        //    if (altitudeMap[key] > grid.waterLevel)
+        //    {
+        //        int neighborWaterTiles = 0;
+        //        foreach (HexTile neighborTile in tile.GetNeighbors())
+        //        {
+        //            float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
+        //            if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
+        //        }
+
+        //        if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
+        //        {
+        //            newAltitudeMap[key] = grid.waterLevel;
+        //        }
+        //        else
+        //        {
+        //            newAltitudeMap[key] = altitudeMap[key];
+        //        }
+        //    }
+        //    else
+        //    {
+        //        int neighborLandTiles = 0;
+        //        foreach (HexTile neighborTile in tile.GetNeighbors())
+        //        {
+        //            float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
+        //            if (altitude > grid.waterLevel) { neighborLandTiles++; }
+        //        }
+
+        //        if (neighborLandTiles > tile.GetNeighbors().Length - 1)
+        //        {
+        //            newAltitudeMap[key] = grid.waterLevel + 0.05f;
+        //        }
+        //        else
+        //        {
+        //            newAltitudeMap[key] = altitudeMap[key];
+        //        }
+        //    }
+        //}
+
+        return newNoiseMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
