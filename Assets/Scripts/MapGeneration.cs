@@ -7,8 +7,13 @@ this class is going to contain different types of map generation, just to see wh
 things to look into: cellular automata, perlin noise, simplex noise, and diamond square
 */
 
-//TODO: add functions for adding terrain features, and actual objects along with a function for adding a water boundary around the map
-//      will probably also need to add post- and preprocessing functions for the map generation to make it look nicer and less fractal
+/*  TODO: add functions for adding terrain features, and actual objects along with a function for adding a water boundary around the map.
+        Will probably also need to add post- and preprocessing functions for the map generation to make it look nicer and less fractal
+
+    TODO: add support for generating maps with multiple landmasses instead of only one central landmass.
+        Could do this by placing seeds around the grid randomly which indicate where landmasses will be created.
+        These seeds will then be made into landmasses by modifying the water-boundary generation to take into account distance from the nearest landmass seed.
+*/ 
 
 public static class MapGeneration
 {
@@ -44,7 +49,6 @@ public static class MapGeneration
         return GenerateNoiseMap(grid, scale, exponent);
     }
 
-    // move mountain generation to be done here as well, since altitude is used to modulate temperature
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
     public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
     {
@@ -64,7 +68,16 @@ public static class MapGeneration
             altitudeMap = GenerateElevationFeatures(grid, altitudeMap);
         }
 
-        return GenerateWaterBoundary(grid, altitudeMap);
+        altitudeMap = GenerateWaterBoundary(grid, altitudeMap);
+        altitudeMap = cellularAutomataPass(grid, altitudeMap);
+
+        // assign altitude values to tiles here before returning the altitude map
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            grid.FetchTile(entry.Key).SetAltitude(entry.Value);
+        }
+
+        return altitudeMap;
     }
 
     public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
@@ -87,8 +100,8 @@ public static class MapGeneration
         foreach (HexTile tile in grid.GetTiles())
         {
             HexCoordinates coordinates = tile.GetCoordinates();
-            float qn = (coordinates.q + coordinateOffset) / (float) grid.width * scale;
-            float rn = (coordinates.r + coordinateOffset) / (float) grid.height * scale;
+            float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
+            float rn = (coordinates.r + coordinateOffset) / (float)grid.height * scale;
             float sample = 0f;
 
             //a separate pass for each of the amplitudes
@@ -99,7 +112,7 @@ public static class MapGeneration
                 float coordX = (qn * (1f / amplitude)) + offsetQ + offsetQShared;
                 float coordY = (rn * (1f / amplitude)) + offsetR + offsetRShared;
 
-                sample += amplitude * Mathf.PerlinNoise(coordX, coordY);          
+                sample += amplitude * Mathf.PerlinNoise(coordX, coordY);
             }
 
             float fudgeFactor = 1.2f;
@@ -191,32 +204,53 @@ public static class MapGeneration
         //GenerateForests(grid);
     }
 
-    // should try replacing the mountainPronunciation constant with an additional layer of noise,
-    // which could potentially be stretched in one dimension to create bands resulting in mountain ranges
+    /*
+    should try replacing the mountainPronunciation constant with an additional layer of noise,
+    which could potentially be stretched in one dimension to create bands resulting in mountain ranges
+    could also try just mixing multiple (3?) high scale noisemaps and taking the minimum value of these noisemaps
+    for each tile and using it as a mountain mask
+    */
+
     public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
     {
-        Dictionary<(int, int, int), float> elevationMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
+        Dictionary<(int, int, int), float> elevationMask1 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
+        Dictionary<(int, int, int), float> elevationMask2 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
+        Dictionary<(int, int, int), float> elevationMask3 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
+
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             (int, int, int) key = entry.Key;
-            float tileElevationMask = 1f - Mathf.Abs(elevationMask[key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
+            float tileElevationMask = 1f - Mathf.Abs(elevationMask1[key] * 2 - 1.0f);
+            tileElevationMask = Mathf.Min(tileElevationMask, 1f - Mathf.Abs(elevationMask2[key] * 2 - 1.0f));
+            tileElevationMask = Mathf.Min(tileElevationMask, 1f - Mathf.Abs(elevationMask3[key] * 2 - 1.0f));
+
             float newAltitude = Mathf.Clamp01(entry.Value + tileElevationMask * mountainPronunciation * entry.Value);
-            elevationMask[key] = newAltitude;
+            elevationMask1[key] = newAltitude;
         }
+        return elevationMask1;
 
-        // mountain range generation
-        float angle = Random.Range(1f, 360f);
-        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, angle, 2f, 0.3f, exponent: 4f, scale: 4.5f);
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            (int, int, int) key = entry.Key;
-            float tileMountainMask = mountainMask[key];
-            if (tileMountainMask < 0.5f) { continue; } // skip tiles that aren't high peaks
-            tileMountainMask = Mathf.Lerp(elevationMask[key], tileMountainMask + elevationMask[key], tileMountainMask);
-            elevationMask[key] = Mathf.Clamp01(tileMountainMask);
-        }
+        //Dictionary<(int, int, int), float> elevationMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
+        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        //{
+        //    (int, int, int) key = entry.Key;
+        //    float tileElevationMask = 1f - Mathf.Abs(elevationMask[key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
+        //    float newAltitude = Mathf.Clamp01(entry.Value + tileElevationMask * mountainPronunciation * entry.Value);
+        //    elevationMask[key] = newAltitude;
+        //}
 
-        return elevationMask;
+        //// mountain range generation
+        //float angle = Random.Range(1f, 360f);
+        //Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, angle, 2f, 0.3f, exponent: 4f, scale: 4.5f);
+        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        //{
+        //    (int, int, int) key = entry.Key;
+        //    float tileMountainMask = mountainMask[key];
+        //    if (tileMountainMask < 0.5f) { continue; } // skip tiles that aren't high peaks
+        //    tileMountainMask = Mathf.Lerp(elevationMask[key], tileMountainMask + elevationMask[key], tileMountainMask);
+        //    elevationMask[key] = Mathf.Clamp01(tileMountainMask);
+        //}
+
+        //return elevationMask;
         // also possibly to have another pass where individual tiles surrounded by water are pushed down or consolidated to form islands
     }
 
@@ -274,6 +308,64 @@ public static class MapGeneration
                 if (neighborLandTiles > tile.GetNeighbors().Length - 1)
                 {
                     newAltitudeMap[key] = grid.waterLevel + 0.05f;
+                }
+            }
+        }
+
+        return newAltitudeMap;
+    }
+
+    //public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, List<(int, int, int)> landmassSeeds)
+    //{
+    //    foreach ((int, int, int) seed in landmassSeeds)
+    //    {
+
+    //    }
+    //}
+    
+    private static Dictionary<(int, int, int), float> cellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
+    {
+        Dictionary<(int, int, int), float> newAltitudeMap = new Dictionary<(int, int, int), float>();
+
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            (int, int, int) key = entry.Key;
+            HexTile tile = grid.FetchTile(key);
+
+            if (altitudeMap[key] > grid.waterLevel)
+            {
+                int neighborWaterTiles = 0;
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
+                }
+
+                if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
+                {
+                    newAltitudeMap[key] = grid.waterLevel;
+                }
+                else
+                {
+                    newAltitudeMap[key] = altitudeMap[key];
+                }
+            }
+            else
+            {
+                int neighborLandTiles = 0;
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (altitude > grid.waterLevel) { neighborLandTiles++; }
+                }
+
+                if (neighborLandTiles > tile.GetNeighbors().Length - 1)
+                {
+                    newAltitudeMap[key] = grid.waterLevel + 0.05f;
+                }
+                else
+                {
+                    newAltitudeMap[key] = altitudeMap[key];
                 }
             }
         }
@@ -340,7 +432,7 @@ public static class MapGeneration
         if (lowestAltitude == tile.GetAltitude())
         {
             return riverTiles;
-        } 
+        }
         else
         {
             return RiverRecursion(newTile, riverTiles);
@@ -422,7 +514,7 @@ public static class MapGeneration
                     {
                         tile.SetTerrain(DefaultTerrains.grassland);
                     }
-                } 
+                }
                 else if (temperature > 0.24f)
                 {
                     tile.SetTerrain(DefaultTerrains.tundra);
