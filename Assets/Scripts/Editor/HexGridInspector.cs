@@ -29,12 +29,12 @@ public class HexGridInspector : Editor
     bool generateElevationFeatures = false;
 
     // mountain generation parameters
-    float mountainScale = 4.5f;
+    float mountainScale = 7f;
     float mountainXScale = 2f;
     float mountainYScale = 0.3f;
     int mountainAngle = 90;
-    float mountainExponent = 4f;
-    int mountainRangeCount = 1;
+    float mountainExponent = 0.8f;
+    int mountainRangeCount = 3;
 
     bool singleColor = true;
     bool averageElevationFeatures = false;
@@ -265,6 +265,7 @@ public class HexGridInspector : Editor
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
                 Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+                Dictionary<(int, int, int), float> mixValueMask = MapGeneration.GenerateNoiseMap(grid, scale: 4f, exponent: 2f);
                 for (int i = 0; i < mountainRangeCount - 1; i++)
                 {
                     Debug.Log($"Generating mountain range {i}");
@@ -274,12 +275,13 @@ public class HexGridInspector : Editor
                         (int, int, int) key = entry.Key;
                         if (averageElevationFeatures)
                         { 
-                            float tileElevationMask = Mathf.Abs(entry.Value * 2 - 1.0f);
+                            float tileElevationMask = 1f - Mathf.Abs(entry.Value * 2 - 1.0f);
                             mountainMask[key] += tileElevationMask;
                         }
                         else
                         {
-                            float tileElevationMask = Mathf.Min(mountainMask[key], Mathf.Abs(entry.Value * 2 - 1.0f));
+                            //float tileElevationMask = Mathf.Min(mountainMask[key], 1f - Mathf.Abs(entry.Value * 2 - 1.0f));
+                            float tileElevationMask = Mathf.Lerp(mountainMask[key], 1f - Mathf.Abs(entry.Value * 2 - 1.0f), mixValueMask[key]);
                             mountainMask[key] = tileElevationMask;
                         }
                     }
@@ -287,15 +289,22 @@ public class HexGridInspector : Editor
 
                 foreach ((int, int, int) key in mountainMask.Keys.ToList())
                 {
+                    mountainMask[key] = Mathf.Pow(mountainMask[key], 1.25f);
                     if (averageElevationFeatures)
                     {
-                        mountainMask[key] = mountainMask[key] > 0.75f ? mountainMask[key] /= mountainRangeCount : 0f;
+                        float tileAverageMask = mountainMask[key] /= mountainRangeCount;
+                        mountainMask[key] = tileAverageMask > 0.5f ? tileAverageMask : 0f;
                     }
-                    else if (mountainMask[key] < 0.75f)
+                    else if (mountainMask[key] < 0.6f)
                     {
-                        mountainMask[key] = 0f;
+                        mountainMask[key] = Mathf.Pow(mountainMask[key], 2f);
                     }
+                }
 
+                //mountainMask = MapGeneration.cellularAutomataPass(grid, mountainMask, 0.6f, neighborTilesForTransition: 5, passes: 1);
+
+                foreach ((int, int, int) key in mountainMask.Keys.ToList())
+                {
                     HexTile tile = grid.FetchTile(key);
                     float altitude = mountainMask[key];
                     if (altitude >= 0.7f)
