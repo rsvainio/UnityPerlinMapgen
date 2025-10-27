@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System;
 using Codice.Client.Common;
 using System.Linq;
+using Codice.CM.Common.Partial;
 
 [CustomEditor(typeof(HexGrid))]
 public class HexGridInspector : Editor
@@ -22,11 +23,13 @@ public class HexGridInspector : Editor
     float temperatureScale = 2f;
     float temperatureExponent = 1.7f;
 
-    bool generatePrecipitationMap = true;
+    bool generatePrecipitationMap = false;
     bool generateAltitudeMap = true;
-    bool generateTemperatureMap = true;
+    bool generateTemperatureMap = false;
     bool generateRivers = false;
     bool generateElevationFeatures = false;
+
+    float cellularAutomataBoundary = 0f;
 
     // mountain generation parameters
     float mountainScale = 7f;
@@ -63,9 +66,11 @@ public class HexGridInspector : Editor
             generatePrecipitationMap = EditorGUILayout.Toggle("Precipitation map", generatePrecipitationMap);
             generateAltitudeMap = EditorGUILayout.Toggle("Altitude map", generateAltitudeMap);
             generateTemperatureMap = EditorGUILayout.Toggle("Temperature map", generateTemperatureMap);
-            generateRivers = EditorGUILayout.Toggle("Generate Rivers", generateRivers);
-            generateElevationFeatures = EditorGUILayout.Toggle("Generate Elevation Features", generateElevationFeatures);
+            generateRivers = EditorGUILayout.Toggle("Generate rivers", generateRivers);
+            generateElevationFeatures = EditorGUILayout.Toggle("Generate elevation features", generateElevationFeatures);
             //warmPoles = EditorGUILayout.Toggle("Warm poles", warmPoles);
+
+            cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
 
             if (GUILayout.Button("Generate Grid")) { generatedGrid(grid); }
 
@@ -99,7 +104,7 @@ public class HexGridInspector : Editor
                     }
                 }
 
-                foreach (HexTile tile in grid.tiles.Values)
+                foreach (HexTile tile in grid.GetTiles())
                 {
                     (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
 
@@ -176,6 +181,43 @@ public class HexGridInspector : Editor
                     tile.SetBiomeAttributes(0, altitude, temperature);
                     tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, 0f, 1f - temperature * 0.8f);
                 }*/
+            }
+
+            if (GUILayout.Button("Cellular automata pass"))
+            {
+                Dictionary<(int, int, int), float> altitudeMap = new();
+                foreach (HexTile tile in grid.GetTiles())
+                {
+                    altitudeMap.Add(tile.GetCoordinates().ToTuple(), tile.GetAltitude());
+                }
+                altitudeMap = MapGeneration.cellularAutomataPass(grid, altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
+
+                foreach (HexTile tile in grid.GetTiles())
+                {
+                    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
+                    float altitude = altitudeMap[coordinates];
+                    tile.SetAltitude(altitude);
+                    if (altitude <= grid.waterLevel) // water level, might need tweaking
+                    {
+                        Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
+                        tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
+                    }
+                    else if (altitude >= 0.7f)
+                    {
+                        if (altitude >= 0.9f)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                        }
+                        else if (altitude >= 0.8f)
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                        }
+                        else
+                        {
+                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                        }
+                    }
+                }
             }
         }
 
@@ -289,7 +331,7 @@ public class HexGridInspector : Editor
 
                 foreach ((int, int, int) key in mountainMask.Keys.ToList())
                 {
-                    mountainMask[key] = Mathf.Pow(mountainMask[key], 1.25f);
+                    mountainMask[key] = Mathf.Pow(mountainMask[key], 1.5f);
                     if (averageElevationFeatures)
                     {
                         float tileAverageMask = mountainMask[key] /= mountainRangeCount;
@@ -297,7 +339,7 @@ public class HexGridInspector : Editor
                     }
                     else if (mountainMask[key] < 0.6f)
                     {
-                        mountainMask[key] = Mathf.Pow(mountainMask[key], 2f);
+                        mountainMask[key] = Mathf.Pow(mountainMask[key], 1.5f);
                     }
                 }
 
