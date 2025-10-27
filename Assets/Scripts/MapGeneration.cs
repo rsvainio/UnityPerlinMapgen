@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
 
 /*
@@ -70,7 +71,6 @@ public static class MapGeneration
 
         altitudeMap = GenerateWaterBoundary(grid, altitudeMap);
         altitudeMap = cellularAutomataPass(grid, altitudeMap, grid.waterLevel);
-        altitudeMap = cellularAutomataPass(grid, altitudeMap, grid.waterLevel, neighborTilesForTransition: 5, lowerThanBoundary: false);
 
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
@@ -212,24 +212,8 @@ public static class MapGeneration
     for each tile and using it as a mountain mask
     */
 
-    public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f)
+    public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, float mountainPronunciation = 0.75f, int mountainRangeCount = 3)
     {
-        Dictionary<(int, int, int), float> elevationMask1 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
-        Dictionary<(int, int, int), float> elevationMask2 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
-        Dictionary<(int, int, int), float> elevationMask3 = GenerateNoiseMap(grid, scale: 7f, exponent: 0.9f);
-
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            (int, int, int) key = entry.Key;
-            float tileElevationMask = 1f - Mathf.Abs(elevationMask1[key] * 2 - 1.0f);
-            tileElevationMask = Mathf.Min(tileElevationMask, 1f - Mathf.Abs(elevationMask2[key] * 2 - 1.0f));
-            tileElevationMask = Mathf.Min(tileElevationMask, 1f - Mathf.Abs(elevationMask3[key] * 2 - 1.0f));
-
-            float newAltitude = Mathf.Clamp01(entry.Value + tileElevationMask * mountainPronunciation * entry.Value);
-            elevationMask1[key] = newAltitude;
-        }
-        return elevationMask1;
-
         //Dictionary<(int, int, int), float> elevationMask = GenerateNoiseMap(grid, scale: 75f, exponent: 0.9f);
         //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         //{
@@ -237,6 +221,46 @@ public static class MapGeneration
         //    float tileElevationMask = 1f - Mathf.Abs(elevationMask[key] * 2 - 1.0f); // multiplying the original value by 2 and subtracting 1 from it shifts the value range from 0.0 - 1.0 to -1.0 - 1.0
         //    float newAltitude = Mathf.Clamp01(entry.Value + tileElevationMask * mountainPronunciation * entry.Value);
         //    elevationMask[key] = newAltitude;
+        //}
+
+        // mountain range generation
+        float mountainScale = 7f, mountainExponent = 1f, mountainBoundary = 0.6f;
+        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+        Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(grid, scale: 4f, exponent: 2f);
+        for (int i = 0; i < mountainRangeCount - 1; i++)
+        {
+            Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+            foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
+            {
+                (int, int, int) key = entry.Key;
+                float tileElevationMask = Mathf.Lerp(mountainMask[key], 1f - Mathf.Abs(entry.Value * 2 - 1.0f), mixValueMask[key]);
+                mountainMask[key] = Mathf.Clamp01(tileElevationMask);
+            }
+        }
+
+        mountainMask = MapGeneration.cellularAutomataPass(grid, mountainMask, mountainBoundary, neighborTilesForTransition: 4, passes: 1); // make the generated mountain ranges less fractal
+        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        {
+            (int, int, int) key = entry.Key;
+            float tileMountainMask = Mathf.Pow(mountainMask[key], 1.5f);
+            if (tileMountainMask < mountainBoundary)
+            {
+                tileMountainMask = Mathf.Pow(tileMountainMask, 1.5f);
+            }
+
+            //float mixValue = altitudeMap[key] < grid.waterLevel * 1.5f ? altitudeMap[key] : tileMountainMask; // make the mountain mask less prominent if the tile is close to water level
+            float mixValue = altitudeMap[key] < grid.waterLevel * 1.5f ? 0.1f : 1f;
+            mixValue = tileMountainMask * mixValue;
+            tileMountainMask = Mathf.SmoothStep(altitudeMap[key], tileMountainMask + altitudeMap[key], mixValue);
+            mountainMask[key] = Mathf.Clamp01(tileMountainMask);
+        }
+
+        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        //{
+        //    (int, int, int) key = entry.Key;
+        //    float tileMountainMask = Mathf.Pow(mountainMask[key], 2f);
+        //    tileMountainMask = Mathf.Lerp(elevationMask[key], tileMountainMask + elevationMask[key], tileMountainMask);
+        //    elevationMask[key] = Mathf.Clamp01(tileMountainMask);
         //}
 
         //// mountain range generation
@@ -251,8 +275,7 @@ public static class MapGeneration
         //    elevationMask[key] = Mathf.Clamp01(tileMountainMask);
         //}
 
-        //return elevationMask;
-        // also possibly to have another pass where individual tiles surrounded by water are pushed down or consolidated to form islands
+        return mountainMask;
     }
 
     public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
@@ -277,45 +300,13 @@ public static class MapGeneration
             newAltitudeMap[entry.Key] = shaping;
         }
 
-        // single cellular automata pass to remove some lone tiles surrounded by water and vice versa
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            (int, int, int) key = entry.Key;
-            HexTile tile = grid.FetchTile(key);
-
-            if (newAltitudeMap[key] > grid.waterLevel)
-            {
-                int neighborWaterTiles = 0;
-                foreach (HexTile neighborTile in tile.GetNeighbors())
-                {
-                    float altitude = newAltitudeMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
-                }
-
-                if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
-                {
-                    newAltitudeMap[key] = grid.waterLevel;
-                }
-            }
-            else
-            {
-                int neighborLandTiles = 0;
-                foreach (HexTile neighborTile in tile.GetNeighbors())
-                {
-                    float altitude = newAltitudeMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (altitude > grid.waterLevel) { neighborLandTiles++; }
-                }
-
-                if (neighborLandTiles > tile.GetNeighbors().Length - 1)
-                {
-                    newAltitudeMap[key] = grid.waterLevel + 0.05f;
-                }
-            }
-        }
-
         return newAltitudeMap;
     }
 
+    // ways of implementing this could be to create each landmass separately and then combine them into the already existing map
+    // alternatively this function could proceed similarly to the original function, but instead of just comparing each tile's distance
+    // to the edge of the map it takes into account the distance to each landmass seed as well and modulates the height of the tile based on that
+    // something akin to mixValue = Mathf.Max(distanceFromMapBorder, distanceFromNearestSeed)
     //public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, List<(int, int, int)> landmassSeeds)
     //{
     //    foreach ((int, int, int) seed in landmassSeeds)
@@ -324,62 +315,51 @@ public static class MapGeneration
     //    }
     //}
 
-    private static Dictionary<(int, int, int), float> cellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, bool lowerThanBoundary = true)
+    // could potentially generalize this to be type-agnostic instead of requiring a noisemap
+    public static Dictionary<(int, int, int), float> cellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, int passes = 1)
     {
         Dictionary<(int, int, int), float> newNoiseMap = new Dictionary<(int, int, int), float>();
+        int tilesWith0Value = 0; // for tracking the number of tiles in the noise map with a value of 0
 
         foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
         {
             (int, int, int) key = entry.Key;
             HexTile tile = grid.FetchTile(key);
+            if (noiseMap[tile.GetCoordinates().ToTuple()] == 0f) { tilesWith0Value++; }
 
             int neighborBoundaryTiles = 0;
-            float newValue = 0f;
-            if (noiseMap[key] > boundary && !lowerThanBoundary)
+            float tileNewValue = 0f; // the new value to which the tile will be set if transitioned
+            HexTile[] neighborTiles = tile.GetNeighbors();
+            if (noiseMap[key] > boundary)
             {
-                foreach (HexTile neighborTile in tile.GetNeighbors())
+                foreach (HexTile neighborTile in neighborTiles)
                 {
                     float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (value <= boundary) 
+                    if (value <= boundary)
                     {
                         neighborBoundaryTiles++;
-                        newValue += value;
+                        tileNewValue += value;
                     }
                 }
-
-                int neighborTileReq = tile.GetNeighbors().Length == 6 ? neighborTilesForTransition : (int) Mathf.Round(neighborTilesForTransition / 6f * tile.GetNeighbors().Length);
-                if (neighborBoundaryTiles > neighborTileReq)
-                {
-                    newValue /= neighborBoundaryTiles;
-                    newNoiseMap[key] = newValue;
-                }
-                else
-                {
-                    newNoiseMap[key] = noiseMap[key];
-                }
             }
-            else if (noiseMap[key] <= boundary && lowerThanBoundary)
+            else
             {
-                foreach (HexTile neighborTile in tile.GetNeighbors())
+                foreach (HexTile neighborTile in neighborTiles)
                 {
                     float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
                     if (value > boundary)
                     {
                         neighborBoundaryTiles++;
-                        newValue += value;
+                        tileNewValue += value;
                     }
                 }
+            }
 
-                int neighborTileReq = tile.GetNeighbors().Length == 6 ? neighborTilesForTransition : (int) Mathf.Round(neighborTilesForTransition / 6f * tile.GetNeighbors().Length);
-                if (neighborBoundaryTiles > neighborTileReq)
-                {
-                    newValue /= neighborBoundaryTiles;
-                    newNoiseMap[key] = boundary + 0.05f;
-                }
-                else
-                {
-                    newNoiseMap[key] = noiseMap[key];
-                }
+            int neighborTileReq = neighborTiles.Length == 6 ? neighborTilesForTransition : (int)Mathf.Round(neighborTilesForTransition / 6f * neighborTiles.Length);
+            if (neighborBoundaryTiles > neighborTileReq)
+            {
+                tileNewValue /= neighborBoundaryTiles;
+                newNoiseMap[key] = tileNewValue;
             }
             else
             {
@@ -387,50 +367,19 @@ public static class MapGeneration
             }
         }
 
-        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        //{
-        //    (int, int, int) key = entry.Key;
-        //    HexTile tile = grid.FetchTile(key);
-
-        //    if (altitudeMap[key] > grid.waterLevel)
-        //    {
-        //        int neighborWaterTiles = 0;
-        //        foreach (HexTile neighborTile in tile.GetNeighbors())
-        //        {
-        //            float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
-        //            if (altitude <= grid.waterLevel) { neighborWaterTiles++; }
-        //        }
-
-        //        if (neighborWaterTiles > tile.GetNeighbors().Length / 2 + 1)
-        //        {
-        //            newAltitudeMap[key] = grid.waterLevel;
-        //        }
-        //        else
-        //        {
-        //            newAltitudeMap[key] = altitudeMap[key];
-        //        }
-        //    }
-        //    else
-        //    {
-        //        int neighborLandTiles = 0;
-        //        foreach (HexTile neighborTile in tile.GetNeighbors())
-        //        {
-        //            float altitude = altitudeMap[neighborTile.GetCoordinates().ToTuple()];
-        //            if (altitude > grid.waterLevel) { neighborLandTiles++; }
-        //        }
-
-        //        if (neighborLandTiles > tile.GetNeighbors().Length - 1)
-        //        {
-        //            newAltitudeMap[key] = grid.waterLevel + 0.05f;
-        //        }
-        //        else
-        //        {
-        //            newAltitudeMap[key] = altitudeMap[key];
-        //        }
-        //    }
-        //}
-
-        return newNoiseMap;
+        Debug.Assert(newNoiseMap.Count == noiseMap.Count, $"Generated only {newNoiseMap.Count} tiles out of the required {noiseMap.Count}", grid);
+        if (tilesWith0Value > (float)(grid.height * grid.width * 0.1f))
+        {
+            Debug.LogWarning($"Found {tilesWith0Value} tiles with an initial value of 0, parameter noise map may not be initialized correctly", grid);
+        }
+        if (passes > 0)
+        {
+            return cellularAutomataPass(grid, newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
+        }
+        else
+        {
+            return newNoiseMap;
+        } 
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
