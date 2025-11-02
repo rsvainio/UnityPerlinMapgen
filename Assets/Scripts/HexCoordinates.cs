@@ -18,12 +18,49 @@ public struct HexCoordinates
         this.r = r;
         s = -q - r;
     }
+    public HexCoordinates((int, int, int) coordinates)
+    {
+        this.q = coordinates.Item1;
+        this.r = coordinates.Item2;
+        this.s = coordinates.Item3;
+    }
+
     public HexCoordinates HexAdd(HexCoordinates coordinates)
     {
         int q = this.q + coordinates.q;
         int r = this.r + coordinates.r;
         int s = this.s + coordinates.s;
         return new HexCoordinates(q, r, s);
+    }
+
+    public static HexCoordinates HexAdd(HexCoordinates a, HexCoordinates b)
+    {
+        int q = a.q + b.q;
+        int r = a.r + b.r;
+        int s = a.s + b.s;
+        return new HexCoordinates(q, r, s);
+    }
+
+    public HexCoordinates HexSubtract(HexCoordinates coordinates)
+    {
+        int q = this.q - coordinates.q;
+        int r = this.r - coordinates.r;
+        int s = this.s - coordinates.s;
+        return new HexCoordinates(q, r, s);
+    }
+
+    public static HexCoordinates HexSubtract(HexCoordinates a, HexCoordinates b)
+    {
+        int q = a.q - b.q;
+        int r = a.r - b.r;
+        int s = a.s - b.s;
+        return new HexCoordinates(q, r, s);
+    }
+
+    public static int HexDistance(HexCoordinates a, HexCoordinates b)
+    {
+        HexCoordinates vector = HexSubtract(a, b);
+        return (Mathf.Abs(vector.q) + Mathf.Abs(vector.r) + Mathf.Abs(vector.s)) / 2;
     }
 
     public static HexCoordinates FromPosition(Vector3 position)
