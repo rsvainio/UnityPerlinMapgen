@@ -18,11 +18,21 @@ public struct HexCoordinates
         this.r = r;
         s = -q - r;
     }
+
     public HexCoordinates((int, int, int) coordinates)
     {
         this.q = coordinates.Item1;
         this.r = coordinates.Item2;
         this.s = coordinates.Item3;
+    }
+
+    public HexCoordinates (Vector3 position)
+    {
+        float q = (2f / 3f * position.x) / HexMetrics.outerRadius;
+        float r = -(1f / 3f * position.x + (float)Math.Sqrt(3) / 3f * position.z) / HexMetrics.outerRadius;
+
+        HexCoordinates coords = CubeRound(q, r);
+        this = coords;
     }
 
     public HexCoordinates HexAdd(HexCoordinates coordinates)
@@ -61,14 +71,6 @@ public struct HexCoordinates
     {
         HexCoordinates vector = HexSubtract(a, b);
         return (Mathf.Abs(vector.q) + Mathf.Abs(vector.r) + Mathf.Abs(vector.s)) / 2;
-    }
-
-    public static HexCoordinates FromPosition(Vector3 position)
-    {
-        float q = (2f / 3f * position.x) / HexMetrics.outerRadius;
-        float r = -(1f / 3f * position.x + (float)Math.Sqrt(3) / 3f * position.z) / HexMetrics.outerRadius;
-
-        return CubeRound(q, r);
     }
 
     private static HexCoordinates CubeRound(float q, float r, float s)

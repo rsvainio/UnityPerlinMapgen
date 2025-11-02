@@ -8,6 +8,7 @@ using UnityEngine.UI;
 public class HexGrid : MonoBehaviour
 {
     public int width, height;
+    public int widthMax, widthMin, heightMax, heightMin;
     public Color defaultColor = Color.white;
     public Color touchedColor = Color.magenta;
     public HexTile tilePrefab;
@@ -101,7 +102,7 @@ public class HexGrid : MonoBehaviour
     private void TouchTile(Vector3 position)
     {
         position = transform.InverseTransformPoint(position);
-        HexCoordinates coordinates = HexCoordinates.FromPosition(position);
+        HexCoordinates coordinates = new HexCoordinates(position);
         Debug.Log("touched at " + coordinates.ToString());
     }
 
@@ -129,12 +130,20 @@ public class HexGrid : MonoBehaviour
                 Debug.Assert((q + r + s == 0)); // replaces Exception throw below
                 //if (q + r + s != 0) throw new Exception("Hex coordinate sum not equal to 0");
                 position.x = hexRadius * 3.0f / 2.0f * q;
+
+                // should look into reversing this and using the original equation
+                // currently R is negative on the upper bound and positive on the lower bound, which is counter-intuitive
                 position.z = hexRadius * Mathf.Sqrt(3.0f) * (-r + -q / 2.0f); //original equation was (hexRadius * Mathf.Sqrt(3.0f) * (r + q / 2.0f)) but it resulted in the r and s coordinates being reversed
                 
                 tile = CreateTile(position, q, r, s);
                 tiles.Add((q, r, s), tile);
             }
         }
+
+        widthMax = rightBound;
+        widthMin = leftBound;
+        heightMax = bottomBound;
+        heightMin = topBound;
 
         Debug.Log("Generated " + tiles.Count + " tiles");
     }

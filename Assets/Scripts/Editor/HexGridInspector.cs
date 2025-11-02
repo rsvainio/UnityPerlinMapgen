@@ -1,10 +1,8 @@
-using UnityEngine;
-using UnityEditor;
-using System.Collections.Generic;
 using System;
-using Codice.Client.Common;
+using System.Collections.Generic;
 using System.Linq;
-using Codice.CM.Common.Partial;
+using UnityEditor;
+using UnityEngine;
 
 [CustomEditor(typeof(HexGrid))]
 public class HexGridInspector : Editor
@@ -72,9 +70,9 @@ public class HexGridInspector : Editor
 
             cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
 
-            if (GUILayout.Button("Generate Grid")) { generatedGrid(grid); }
+            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); }
 
-            if (GUILayout.Button("Clear Grid")) { clearGrid(grid); }
+            if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
 
             if (GUILayout.Button("Generate Noisemaps"))
             {
@@ -86,7 +84,7 @@ public class HexGridInspector : Editor
                 if (generateAltitudeMap)
                 {
                     altitudeMap = MapGeneration.GenerateAltitudeMap(grid, scale: this.altitudeScale, exponent: this.altitudeExponent,
-                                                  amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures);
+                                    amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures);
                 }
 
                 if (generateTemperatureMap)
@@ -94,7 +92,7 @@ public class HexGridInspector : Editor
                     temperatureMap = MapGeneration.GenerateTemperatureMap(grid, scale: this.temperatureScale, exponent: this.temperatureExponent);
                     try
                     {
-                        temperatureMap = MapGeneration.TemperatureRefinementPass(grid, temperatureMap, altitudeMap);
+                        temperatureMap = MapGeneration.DoTemperatureRefinementPass(grid, temperatureMap, altitudeMap);
                     }
                     catch (NullReferenceException)
                     {
@@ -147,15 +145,6 @@ public class HexGridInspector : Editor
                             //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, altitude, 0f);
                         }
                     }
-
-                    // alternative gradient colouring courtesy of https://www.shadedrelief.com/hypso/hypso.html
-                    /*
-                    Color humid = new Color(160 / 255f, 195 / 255f, 177 / 255f);
-                    Color arid = new Color(237 / 255f, 216 / 255f, 197 / 255f);
-                    Color blend = Color.Lerp(arid, humid, precipitation);
-                    Color final = Color.Lerp(blend, new Color(1, 1, 1), altitude);
-                    tile.GetComponentInChildren<MeshRenderer>().material.color = final;
-                    */
                 }
 
                 if (generateRivers)
@@ -190,7 +179,7 @@ public class HexGridInspector : Editor
                 {
                     altitudeMap.Add(tile.GetCoordinates().ToTuple(), tile.GetAltitude());
                 }
-                altitudeMap = MapGeneration.cellularAutomataPass(grid, altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
+                altitudeMap = MapGeneration.DoCellularAutomataPass(grid, altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
 
                 foreach (HexTile tile in grid.GetTiles())
                 {
@@ -234,9 +223,9 @@ public class HexGridInspector : Editor
             singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
             averageElevationFeatures = EditorGUILayout.Toggle("Elevation features by average", averageElevationFeatures);
 
-            if (GUILayout.Button("Generate Grid")) { generatedGrid(grid); }
+            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); }
 
-            if (GUILayout.Button("Clear Grid")) { clearGrid(grid); }
+            if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
 
             if (GUILayout.Button("Generate Mountain Ranges"))
             {
@@ -373,7 +362,7 @@ public class HexGridInspector : Editor
         }
     }
 
-    static void generatedGrid(HexGrid grid)
+    static void GenerateGrid(HexGrid grid)
     {
         if (grid.tiles.Count == 0)
         {
@@ -385,7 +374,7 @@ public class HexGridInspector : Editor
         }
     }
 
-    static void clearGrid(HexGrid grid)
+    static void ClearGrid(HexGrid grid)
     {
         if (grid.tiles.Count != 0)
         {

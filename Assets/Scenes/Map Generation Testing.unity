@@ -148,13 +148,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9666a10e6fdbee44c8f581eb6fba1764, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 200
-  height: 200
+  width: 100
+  height: 100
   defaultColor: {r: 1, g: 1, b: 1, a: 1}
   touchedColor: {r: 1, g: 0, b: 1, a: 1}
   tilePrefab: {fileID: 7405467310963709556, guid: 063e5523d4b028346929a7196e680626, type: 3}
   tileLabelPrefab: {fileID: 5252619948649948924, guid: e0f4ca828f016eb41a4feb605ec3c4c0, type: 3}
   terrainList: []
+  waterLevel: 0.175
 --- !u!4 &528801242
 Transform:
   m_ObjectHideFlags: 0
