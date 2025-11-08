@@ -9,12 +9,13 @@ this class is going to contain different types of map generation, just to see wh
 things to look into: cellular automata, perlin noise, simplex noise, and diamond square
 */
 
-/*  TODO: add functions for adding terrain features, and actual objects along with a function for adding a water boundary around the map.
-        Will probably also need to add post- and preprocessing functions for the map generation to make it look nicer and less fractal
-
-    TODO: add support for generating maps with multiple landmasses instead of only one central landmass.
+/*
+    TODO (maybe): add support for generating maps with multiple landmasses instead of only one central landmass.
         Could do this by placing seeds around the grid randomly which indicate where landmasses will be created.
         These seeds will then be made into landmasses by modifying the water-boundary generation to take into account distance from the nearest landmass seed.
+
+    TODO: implement function for detecting different "regions" of the map, such as oceans, plains, mountain ranges, etc.
+        This will need pathfinding to be implemented, likely in the HexTile class.
 */ 
 
 public static class MapGeneration
@@ -215,7 +216,7 @@ public static class MapGeneration
     public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, int mountainRangeCount = 3)
     {
         // mountain range generation
-        float mountainScale = 7f, mountainExponent = 1f, mountainBoundary = 0.6f;
+        float mountainScale = 7f, mountainExponent = 1f;
         Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
         Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(grid, scale: 4f, exponent: 2f);
         for (int i = 0; i < mountainRangeCount - 1; i++)
@@ -229,19 +230,14 @@ public static class MapGeneration
             }
         }
 
-        //mountainMask = DoCellularAutomataPass(grid, mountainMask, mountainBoundary, neighborTilesForTransition: 4, passes: 1); // make the generated mountain ranges less fractal
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             (int, int, int) key = entry.Key;
             float tileMountainMask = Mathf.Pow(mountainMask[key], 1.5f);
-            if (tileMountainMask < mountainBoundary)
-            {
-                tileMountainMask = Mathf.Pow(tileMountainMask, 1.5f);
-            }
 
-            float mixValue = Mathf.InverseLerp(grid.waterLevel, grid.waterLevel * 1.5f, altitudeMap[key]);
-            mixValue = tileMountainMask * mixValue;
-            tileMountainMask = Mathf.SmoothStep(altitudeMap[key], tileMountainMask + altitudeMap[key], mixValue);
+            float mixValue = Mathf.InverseLerp(grid.waterLevel, grid.waterLevel * 2f, altitudeMap[key]);
+            mixValue *= tileMountainMask;
+            tileMountainMask = Mathf.Lerp(altitudeMap[key], tileMountainMask + altitudeMap[key], mixValue);
             mountainMask[key] = Mathf.Clamp01(tileMountainMask);
         }
 
@@ -262,7 +258,7 @@ public static class MapGeneration
             yDistance = 2 * yDistance / grid.height;
 
             float shaping = Mathf.Pow(Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2)), 4f); // https://www.wolframalpha.com/input?i=plot+%28sin%28x*pi%29sin%28y*pi%29%29%5E4+from+0+to+1
-            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 2f);
+            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 1.75f);
             mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
             mixValue *= Mathf.Lerp(0.75f, 1.25f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
             shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
@@ -405,8 +401,10 @@ public static class MapGeneration
         }
     }
 
+    // this will need to be rewritten
     public static void AssignTerrains(HexGrid grid)
     {
+        /*
         if (grid.terrainList == null)
         {
             //grid.ReadTerrainTypes();
@@ -495,5 +493,6 @@ public static class MapGeneration
                 tile.SetTerrain(DefaultTerrains.mountain);
             }
         }
+    */
     }
 }
