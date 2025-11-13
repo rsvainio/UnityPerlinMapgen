@@ -1,5 +1,0 @@
-{
-	"id": "terrain.wall",
-	"baseMovementCost": "1",
-	"tileColor": "black"
-}
