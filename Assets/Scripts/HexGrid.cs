@@ -16,10 +16,11 @@ public class HexGrid : MonoBehaviour
     public Terrain[] terrainList;
 
     //might make this into a dictionary with the key being a TerrainType object, and the value being the Mesh for that type of terrain
-    //e.g. public Dictionary<TerrainType, Mesh> terrainMeshes = new Dictionary<(TerrainType, Mesh>();
+    //e.g. public Dictionary<TerrainType, Mesh> terrainMeshes = new Dictionary<(TerrainType, Mesh>());
     Mesh hexMesh = null;
 
     public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
+    public List<HexTile> borderTiles = new List<HexTile>();
     public List<List<HexTile>> rivers;
     public float waterLevel = 0.175f; // this will probably be moved elsewhere later
 
@@ -286,7 +287,7 @@ public class HexGrid : MonoBehaviour
                     
                     //Debug.Log(terrain.id);
                     Debug.Log(terrain.baseMovementCost);
-                    Debug.Log(terrain.tileColor);
+                    Debug.Log(terrain.baseColor);
                     Debug.Log(terrain.ToString());
                 }
             }

@@ -41,7 +41,7 @@ public class HexTile : MonoBehaviour
     public void SetTerrain(Terrain terrain)
     {
         this.terrain = terrain;
-        GetComponentInChildren<MeshRenderer>().material.color = terrain.tileColor;
+        GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;
     }
 
     //returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null when the function is called
@@ -66,6 +66,7 @@ public class HexTile : MonoBehaviour
             }
 
             Array.Resize(ref neighbors, neighbors.Length - j);
+            if (neighbors.Length < 6) { grid.borderTiles.Add(this); } // add this tile to the list of map border tiles if it has fewer than 6 neighbors
         }
 
         return neighbors;
