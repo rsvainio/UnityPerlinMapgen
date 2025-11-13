@@ -16,7 +16,7 @@ things to look into: cellular automata, perlin noise, simplex noise, and diamond
 
     TODO: implement function for detecting different "regions" of the map, such as oceans, plains, mountain ranges, etc.
         This will need pathfinding to be implemented, likely in the HexTile class.
-*/ 
+*/
 
 public static class MapGeneration
 {
@@ -53,7 +53,7 @@ public static class MapGeneration
     }
 
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
-    public static Dictionary<(int, int, int), float> GenerateAltitudeMap(   HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f,
+    public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f,
                                                                             bool generateElevationFeatures = true, List<HexCoordinates> landmassSeeds = null)
     {
         Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
@@ -85,10 +85,11 @@ public static class MapGeneration
             grid.FetchTile(entry.Key).SetAltitude(entry.Value);
         }
 
+        MapOceanTiles(grid);
         return altitudeMap;
     }
 
-    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 6f, float exponent = 1.5f, int amplitudeCount = 4)
     {
         return GenerateNoiseMap(grid, scale, exponent);
     }
@@ -183,25 +184,40 @@ public static class MapGeneration
         float poleTemp = 0.65f;
         float equatorTemp = 1.35f;
         if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.65f; }
+        Dictionary<(int, int, int), float> newTemperatureMap = new();
+        float averageTemperature = 0;
 
+        // calculate each tile's distance from the equator and modulate the temperature based on that
+        // in addition calculate the average temperature of the entire map before altitudinal temperature modulation
+        // so that it can be used to drift the temperature values of tiles close to the ocean towards the average
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
+            (int, int, int) key = entry.Key;
             float altitude = entry.Value;
-            float temperature = temperatureMap[entry.Key];
-            int rCoord = entry.Key.Item2;
-            int sCoord = entry.Key.Item3;
+            float temperature = temperatureMap[key];
+            int rCoord = key.Item2;
+            int sCoord = key.Item3;
 
             float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
-            float sine = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
+            distanceFromEquator = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
+            float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, distanceFromEquator);
 
-            float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, sine);
-            newTemperature = newTemperature * Mathf.Lerp(1.5f, 0.5f, altitude);
+            //newTemperature = Mathf.Pow(newTemperature, 0.75f + altitude);
+            //newTemperature *= Mathf.Lerp(1.5f, 0.5f, altitude);
 
-            newTemperature = Mathf.Clamp01(newTemperature);
-            temperatureMap[entry.Key] = newTemperature;
+            averageTemperature += newTemperature;
+            newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
         }
+        averageTemperature /= newTemperatureMap.Count;
 
-        return temperatureMap;
+        // modulate the temperature of tiles based on ocean proximity and altitude
+        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+        //{
+        //    (int, int, int) key = entry.Key;
+        //    Mathf.Lerp(originalTemperature, averageTemperature, distanceFromNearestOcean);
+        //}
+
+        return newTemperatureMap;
     }
 
     public static void GenerateTerrainFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
@@ -308,7 +324,7 @@ public static class MapGeneration
                 }
             }
 
-            int neighborTileReq = neighborTiles.Length == 6 ? neighborTilesForTransition : (int) Mathf.Round(neighborTilesForTransition * (neighborTiles.Length / 6f));
+            int neighborTileReq = neighborTiles.Length == 6 ? neighborTilesForTransition : (int)Mathf.Round(neighborTilesForTransition * (neighborTiles.Length / 6f));
             if (neighborBoundaryTiles > neighborTileReq)
             {
                 tileNewValue /= neighborBoundaryTiles;
@@ -325,14 +341,14 @@ public static class MapGeneration
         {
             Debug.LogWarning($"Found {tilesWith0Value} tiles with an initial value of 0, parameter noise map may not be initialized correctly", grid);
         }
-        if (passes > 0)
+        if (passes > 1)
         {
             return DoCellularAutomataPass(grid, newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
         }
         else
         {
             return newNoiseMap;
-        } 
+        }
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
@@ -399,6 +415,28 @@ public static class MapGeneration
         {
             return DoRiverRecursion(newTile, riverTiles);
         }
+    }
+
+    private static void MapOceanTiles(HexGrid grid)
+    {
+        foreach (HexTile tile in grid.borderTiles)
+        {
+            DoOceanMappingRecursion(tile);
+        }
+        
+        void DoOceanMappingRecursion(HexTile tile)
+        {
+            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
+            {
+                tile.SetTerrain(Terrain.Ocean);
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    DoOceanMappingRecursion(neighborTile);
+                }
+            }
+        }
+
+        return;
     }
 
     // this will need to be rewritten
