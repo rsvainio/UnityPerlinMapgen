@@ -85,7 +85,6 @@ public static class MapGeneration
             grid.FetchTile(entry.Key).SetAltitude(entry.Value);
         }
 
-        MapOceanTiles(grid);
         return altitudeMap;
     }
 
@@ -178,7 +177,7 @@ public static class MapGeneration
         return noiseMap;
     }
 
-    //varies tile temperatures based on pole proximity and elevation
+    //varies tile temperatures based on pole proximity and altitude
     public static Dictionary<(int, int, int), float> DoTemperatureRefinementPass(HexGrid grid, Dictionary<(int, int, int), float> temperatureMap, Dictionary<(int, int, int), float> altitudeMap, bool warmPoles = false)
     {
         float poleTemp = 0.65f;
@@ -189,7 +188,7 @@ public static class MapGeneration
 
         // calculate each tile's distance from the equator and modulate the temperature based on that
         // in addition calculate the average temperature of the entire map before altitudinal temperature modulation
-        // so that it can be used to drift the temperature values of tiles close to the ocean towards the average
+        // so that it can be used to drift the temperature values of tiles closer to the ocean towards the average
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             (int, int, int) key = entry.Key;
@@ -209,13 +208,60 @@ public static class MapGeneration
             newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
         }
         averageTemperature /= newTemperatureMap.Count;
+        Debug.Log($"Average temperature of the map: {averageTemperature}");
+
+        MapOceanTiles(grid); // make sure that ocean tiles are actually set
 
         // modulate the temperature of tiles based on ocean proximity and altitude
-        //foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        //{
-        //    (int, int, int) key = entry.Key;
-        //    Mathf.Lerp(originalTemperature, averageTemperature, distanceFromNearestOcean);
-        //}
+        foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
+        {
+            (int, int, int) key = entry.Key;
+            float originalTemperature = newTemperatureMap[key];
+            float distanceFromNearestOcean = 1f;
+            HexTile tile = grid.FetchTile(key);
+
+            if (tile.terrain != Terrain.Ocean)
+            {   
+                // do a breadth-first search to make sure that it is actually the nearest ocean tile that is found
+                Queue<HexTile> tileQueue = new Queue<HexTile>();
+                Dictionary<(int, int, int), bool> exploredTiles = new Dictionary<(int, int, int), bool>();
+
+                foreach(HexTile neighborTile in tile.GetNeighbors())
+                {
+                    tileQueue.Enqueue(neighborTile);
+                    exploredTiles[neighborTile.GetCoordinates().ToTuple()] = true;
+                }
+
+                while (tileQueue.Count > 0)
+                {
+                    HexTile neighborTile = tileQueue.Dequeue();
+                    if (neighborTile.terrain == Terrain.Ocean)
+                    {
+                        float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
+                        float maxDistance = (grid.height + grid.width) / 2;
+                        distanceFromNearestOcean = tileDistance / maxDistance;
+
+                        tileQueue.Clear();
+                    }
+                    else
+                    {
+                        foreach (HexTile tileToExplore in neighborTile.GetNeighbors())
+                        {
+                            (int, int, int) coordinateTuple = tileToExplore.GetCoordinates().ToTuple();
+                            bool explored = exploredTiles.TryGetValue(coordinateTuple, out bool value);
+                            if (explored) { continue; }
+
+                            tileQueue.Enqueue(tileToExplore);
+                            exploredTiles[coordinateTuple] = true;
+                        }
+                    }
+                }
+            }
+
+            newTemperatureMap[key] = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+            // finally do some altitudinal temperature modulation here
+            //newTemperatureMap[key] = Mathf.Lerp()
+        }
 
         return newTemperatureMap;
     }
@@ -389,6 +435,8 @@ public static class MapGeneration
 
     // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
     // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
+    //
+    // this should also be made into a local function within the river building function (see MapOceanTiles() below)
     private static List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
     {
         float lowestAltitude = tile.GetAltitude();
