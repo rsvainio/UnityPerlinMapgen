@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -19,7 +20,7 @@ public class HexGridInspector : Editor
     float altitudeExponent = 2f; // these values are tuned with elevation feature generation in mind
     int altitudeAmplitudes = 4;
     float temperatureScale = 2f;
-    float temperatureExponent = 1.7f;
+    float temperatureExponent = 1.25f;
 
     bool generatePrecipitationMap = false;
     bool generateAltitudeMap = true;
@@ -102,6 +103,7 @@ public class HexGridInspector : Editor
                     }
                 }
 
+                
                 foreach (HexTile tile in grid.GetTiles())
                 {
                     (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
@@ -113,39 +115,98 @@ public class HexGridInspector : Editor
                     if (generateTemperatureMap) { temperature = temperatureMap[coordinates]; }
                     tile.SetBiomeAttributes(precipitation, altitude, temperature);
 
-                    if (precipitation > 1f || altitude > 1f || temperature > 1f) // tiles that break the 0 - 1 normalization are coloured pure white
+                    Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
+                    if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
+
+                    if (generateAltitudeMap)
                     {
-                        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                    }
-                    else
-                    {
-                        if (altitude <= grid.waterLevel && generateAltitudeMap) // water level, might need tweaking
+                        Color altitudeColor;
+
+                        if (altitude <= grid.waterLevel)
                         {
-                            Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
+                            altitudeColor = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
                         }
-                        else if (altitude >= 0.7f && generateAltitudeMap)
+                        else if (altitude >= 0.7f)
                         {
-                            if (altitude >= 0.9f && generateAltitudeMap)
+                            if (altitude >= 0.9f)
                             {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                                altitudeColor = new Color(1f, 1f, 1f);
                             }
-                            else if (altitude >= 0.8f && generateAltitudeMap)
+                            else if (altitude >= 0.8f)
                             {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                                altitudeColor = new Color(0.8f, 0.8f, 0.8f);
                             }
                             else
                             {
-                                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                                altitudeColor = new Color(0.6f, 0.6f, 0.6f);
                             }
                         }
                         else
                         {
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, precipitation);
-                            //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, altitude, 0f);
+                            altitudeColor = new Color(0f, altitude, 0f);
                         }
+
+                        tileMaterial.SetColor("_Color", altitudeColor);
+                    }
+
+                    if (generateTemperatureMap)
+                    {
+                        Color colorBlend = tileMaterial.GetColor("_Color") + new Color(temperature, 0f, 0f);
+                        tileMaterial.SetColor("_Color", colorBlend);
+                    }
+
+                    if (generatePrecipitationMap)
+                    {
+                        Color colorBlend = tileMaterial.GetColor("_Color") + new Color(0f, 0f, precipitation);
+                        tileMaterial.SetColor("_Color", colorBlend);
                     }
                 }
+
+                //foreach (HexTile tile in grid.GetTiles())
+                //{
+                //    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
+
+                //    float precipitation, temperature, altitude;
+                //    precipitation = temperature = altitude = 0f;
+                //    if (generatePrecipitationMap) { precipitation = precipitationMap[coordinates]; }
+                //    if (generateAltitudeMap) { altitude = altitudeMap[coordinates]; }
+                //    if (generateTemperatureMap) { temperature = temperatureMap[coordinates]; }
+                //    tile.SetBiomeAttributes(precipitation, altitude, temperature);
+
+                //    if (precipitation > 1f || altitude > 1f || temperature > 1f) // tiles that break the 0 - 1 normalization are coloured pure white
+                //    {
+                //        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                //    }
+                //    else
+                //    {
+                //        if (altitude <= grid.waterLevel && generateAltitudeMap) // water level, might need tweaking
+                //        {
+                //            Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
+                //            tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
+                //        }
+                //        else if (altitude >= 0.7f && generateAltitudeMap)
+                //        {
+                //            if (altitude >= 0.9f && generateAltitudeMap)
+                //            {
+                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+                //            }
+                //            else if (altitude >= 0.8f && generateAltitudeMap)
+                //            {
+                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+                //            }
+                //            else
+                //            {
+                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+                //            }
+                //        }
+                //        else
+                //        {
+                //            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, 1f - temperature);
+                //            //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, precipitation);
+                //            //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, altitude, 0f);
+                //        }
+                //    }
+                //}
 
                 if (generateRivers)
                 {
@@ -376,6 +437,7 @@ public class HexGridInspector : Editor
 
     static void ClearGrid(HexGrid grid)
     {
+        grid.borderTiles.Clear();
         if (grid.tiles.Count != 0)
         {
             foreach (HexTile tile in grid.tiles.Values)
