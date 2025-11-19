@@ -400,7 +400,7 @@ public static class MapGeneration
     // altitude seems to be the biggest obstacle for river source candidate spots being found
     // might be fixed after elevation feature generation is implemented
     // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public static void GenerateRivers(HexGrid grid, float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
+    public static List<List<HexTile>> GenerateRivers(HexGrid grid, float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
         List<HexTile> riverSourceCandidates = grid.GetTiles().Where(t => t.GetAltitude() >= minAltitude
                                                 && t.GetTemperature() >= minPrecipitation
@@ -429,40 +429,38 @@ public static class MapGeneration
             rivers.Add(newRiver);
         }
 
-        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
-        grid.rivers = rivers; // this is dumb and should be changed to return the rivers instead
-    }
-
-    // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
-    // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
-    //
-    // this should also be made into a local function within the river building function (see MapOceanTiles() below)
-    private static List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
-    {
-        float lowestAltitude = tile.GetAltitude();
-        HexTile newTile = null;
-        if (riverTiles == null) { riverTiles = new List<HexTile>(); }
-        riverTiles.Add(tile);
-
-        foreach (HexTile neighbor in tile.GetNeighbors())
+        // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
+        // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
+        static List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
         {
-            if (riverTiles.Contains(neighbor)) { continue; } // checks if the new tile is already a part of the same river
-            float newAltitude = neighbor.GetAltitude();
-            if (newAltitude * 0.9f < lowestAltitude)
+            float lowestAltitude = tile.GetAltitude();
+            HexTile newTile = null;
+            if (riverTiles == null) { riverTiles = new List<HexTile>(); }
+            riverTiles.Add(tile);
+
+            foreach (HexTile neighbor in tile.GetNeighbors())
             {
-                newTile = neighbor;
-                lowestAltitude = newAltitude;
+                if (riverTiles.Contains(neighbor)) { continue; } // checks if the new tile is already a part of the same river
+                float newAltitude = neighbor.GetAltitude();
+                if (newAltitude * 0.9f < lowestAltitude)
+                {
+                    newTile = neighbor;
+                    lowestAltitude = newAltitude;
+                }
+            }
+
+            if (lowestAltitude == tile.GetAltitude())
+            {
+                return riverTiles;
+            }
+            else
+            {
+                return DoRiverRecursion(newTile, riverTiles);
             }
         }
 
-        if (lowestAltitude == tile.GetAltitude())
-        {
-            return riverTiles;
-        }
-        else
-        {
-            return DoRiverRecursion(newTile, riverTiles);
-        }
+        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
+        return rivers;
     }
 
     private static void MapOceanTiles(HexGrid grid)

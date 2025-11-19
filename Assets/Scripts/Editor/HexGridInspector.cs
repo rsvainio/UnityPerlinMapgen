@@ -210,7 +210,7 @@ public class HexGridInspector : Editor
 
                 if (generateRivers)
                 {
-                    MapGeneration.GenerateRivers(grid);
+                    grid.rivers = MapGeneration.GenerateRivers(grid);
                     foreach (List<HexTile> river in grid.rivers)
                     {
                         for (int i = 0; i < river.Count; i++)
