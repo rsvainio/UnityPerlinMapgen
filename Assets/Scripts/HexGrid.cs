@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 public class HexGrid : MonoBehaviour
@@ -30,6 +31,7 @@ public class HexGrid : MonoBehaviour
         if (tiles.Count != 0) { DestroyGrid(); }
 
         GenerateGrid();
+        BuildBorderTileList();
         //MapGeneration.GenerateCellularAutomataMap(this);
         //ReadTerrainTypes();
     }
@@ -52,7 +54,6 @@ public class HexGrid : MonoBehaviour
             tile.SetTerrain(null);
             tile.SetBiomeAttributes(0f, 0f, 0f);
         }
-        borderTiles.Clear();
         rivers.Clear();
     }
     
@@ -287,6 +288,17 @@ public class HexGrid : MonoBehaviour
         mesh.RecalculateNormals();
         return mesh;
         //hexMesh = mesh;
+    }
+
+    private void BuildBorderTileList()
+    {
+        foreach (HexTile tile in GetTiles())
+        {
+            if (tile.GetNeighbors().Length != 6) // add this tile to the list of map border tiles if it has fewer than 6 neighbors
+            {
+                borderTiles.Add(tile);
+            }
+        }
     }
 
     public void ReadTerrainTypes(){

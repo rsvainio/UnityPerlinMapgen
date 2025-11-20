@@ -66,7 +66,6 @@ public class HexTile : MonoBehaviour
             }
 
             Array.Resize(ref neighbors, neighbors.Length - j);
-            if (neighbors.Length < 6) { grid.borderTiles.Add(this); } // add this tile to the list of map border tiles if it has fewer than 6 neighbors
         }
 
         return neighbors;
