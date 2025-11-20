@@ -177,7 +177,7 @@ public static class MapGeneration
         return noiseMap;
     }
 
-    //varies tile temperatures based on pole proximity and altitude
+    // varies tile temperatures based on pole and ocean proximity and altitude
     public static Dictionary<(int, int, int), float> DoTemperatureRefinementPass(HexGrid grid, Dictionary<(int, int, int), float> temperatureMap, Dictionary<(int, int, int), float> altitudeMap, bool warmPoles = false)
     {
         float poleTemp = 0.65f;
@@ -238,7 +238,7 @@ public static class MapGeneration
                     if (neighborTile.terrain == Terrain.Ocean)
                     {
                         float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
-                        float maxDistance = (grid.height + grid.width) / 2;
+                        float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
                         distanceFromNearestOcean = tileDistance / maxDistance;
 
                         tileQueue.Clear();
@@ -258,9 +258,10 @@ public static class MapGeneration
                 }
             }
 
-            newTemperatureMap[key] = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
-            // finally do some altitudinal temperature modulation here
-            //newTemperatureMap[key] = Mathf.Lerp()
+            float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+            //float newTemperature = Mathf.Lerp(1f, 0f, 1f - distanceFromNearestOcean);
+            //newTemperature = Mathf.Lerp(0f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 3f));
+            newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
         }
 
         return newTemperatureMap;
@@ -465,6 +466,7 @@ public static class MapGeneration
 
     private static void MapOceanTiles(HexGrid grid)
     {
+        Debug.Log("Starting ocean mapping...");
         foreach (HexTile tile in grid.borderTiles)
         {
             DoOceanMappingRecursion(tile);
