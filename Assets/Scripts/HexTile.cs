@@ -41,7 +41,7 @@ public class HexTile : MonoBehaviour
     public void SetTerrain(Terrain terrain)
     {
         this.terrain = terrain;
-        GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;
+        //GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;
     }
 
     //returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null when the function is called

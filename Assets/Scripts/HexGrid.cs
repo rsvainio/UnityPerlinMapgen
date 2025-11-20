@@ -21,25 +21,39 @@ public class HexGrid : MonoBehaviour
 
     public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
     public List<HexTile> borderTiles = new List<HexTile>();
-    public List<List<HexTile>> rivers;
+    public List<List<HexTile>> rivers = new List<List<HexTile>>();
     public float waterLevel = 0.175f; // this will probably be moved elsewhere later
 
     public void Initialize()
     {
-        GenerateHexMesh();
+        if (hexMesh == null) { GenerateHexMesh(); }
+        if (tiles.Count != 0) { DestroyGrid(); }
+
         GenerateGrid();
         //MapGeneration.GenerateCellularAutomataMap(this);
         //ReadTerrainTypes();
     }
 
-    public void RegenerateGrid()
+    public void DestroyGrid()
     {
         foreach (HexTile tile in tiles.Values)
         {
-            DestroyImmediate(tile.gameObject);
+            Destroy(tile.gameObject);
         }
+        borderTiles.Clear();
+        rivers.Clear();
         tiles.Clear();
-        GenerateGrid();
+    }
+
+    public void ResetGrid()
+    {
+        foreach (HexTile tile in tiles.Values)
+        {
+            tile.SetTerrain(null);
+            tile.SetBiomeAttributes(0f, 0f, 0f);
+        }
+        borderTiles.Clear();
+        rivers.Clear();
     }
     
     private void Update()
