@@ -1,8 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.VisualScripting;
-using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -18,12 +18,17 @@ things to look into: cellular automata, perlin noise, simplex noise, and diamond
         This will need pathfinding to be implemented, likely in the HexTile class.
 */
 
-public static class MapGeneration
+public class MapGeneration
 {
-    //cellular automata variables
-    const float noiseDensity = 0.5f;
-    const int iterations = 3;
+    readonly HexGrid grid;
+    public Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
 
+    public MapGeneration(HexGrid grid)
+    {
+        this.grid = grid;
+    }
+
+    /*
     public static void GenerateCellularAutomataMap(HexGrid grid)
     {
         Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
@@ -46,19 +51,27 @@ public static class MapGeneration
 
         GenerateTerrainFeatures(grid, altitudeMap);
     }
+    */
 
-    public static Dictionary<(int, int, int), float> GeneratePrecipitationMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
-    {
-        return GenerateNoiseMap(grid, scale, exponent);
+    public Dictionary<(int, int, int), float> GeneratePrecipitationMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
+    {   
+        precipitationMap = GenerateNoiseMap(scale, exponent);
+
+        // assign precipitation values to tiles here before returning the altitude map
+        foreach (KeyValuePair<(int, int, int), float> entry in precipitationMap)
+        {
+            grid.FetchTile(entry.Key).SetPrecipitation(entry.Value);
+        }
+
+        return precipitationMap;
     }
 
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
-    public static Dictionary<(int, int, int), float> GenerateAltitudeMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f,
-                                                                            bool generateElevationFeatures = true, List<HexCoordinates> landmassSeeds = null)
+    public Dictionary<(int, int, int), float> GenerateAltitudeMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f, bool generateElevationFeatures = true)
     {
-        Dictionary<(int, int, int), float> altitudeMap = GenerateNoiseMap(grid, scale, exponent / 1.5f, amplitudeCount);
-        Dictionary<(int, int, int), float> altitudeUpperBound = GenerateNoiseMap(grid, scale * 3, exponent * 1.5f, amplitudeCount);
-        Dictionary<(int, int, int), float> altitudeLerpValue = GenerateNoiseMap(grid, scale: 2f, exponent: 1f, amplitudeCount: 1);
+        altitudeMap = GenerateNoiseMap(scale, exponent / 1.5f, amplitudeCount);
+        Dictionary<(int, int, int), float> altitudeUpperBound = GenerateNoiseMap(scale * 3, exponent * 1.5f, amplitudeCount);
+        Dictionary<(int, int, int), float> altitudeLerpValue = GenerateNoiseMap(scale: 2f, exponent: 1f, amplitudeCount: 1);
 
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeLerpValue)
         {
@@ -69,15 +82,14 @@ public static class MapGeneration
 
         if (generateElevationFeatures)
         {
-            altitudeMap = GenerateElevationFeatures(grid, altitudeMap);
+            altitudeMap = GenerateElevationFeatures();
         }
 
         // water boundary generation
-        altitudeMap = GenerateWaterBoundary(grid, altitudeMap);
+        altitudeMap = GenerateWaterBoundary();
 
-
-        altitudeMap = DoCellularAutomataPass(grid, altitudeMap, grid.waterLevel); // water level cellular automata pass
-        altitudeMap = DoCellularAutomataPass(grid, altitudeMap, 0.7f, passes: 2); // mountain level cellular automata pass
+        altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
+        altitudeMap = DoCellularAutomataPass(altitudeMap, 0.7f, passes: 2); // mountain level cellular automata pass
 
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
@@ -88,14 +100,33 @@ public static class MapGeneration
         return altitudeMap;
     }
 
-    public static Dictionary<(int, int, int), float> GenerateTemperatureMap(HexGrid grid, float scale = 6f, float exponent = 1.5f, int amplitudeCount = 4)
+    public Dictionary<(int, int, int), float> GenerateTemperatureMap(float scale = 6f, float exponent = 1.5f, int amplitudeCount = 4, bool temperatureRefinementPass = true)
     {
-        return GenerateNoiseMap(grid, scale, exponent);
+        temperatureMap = GenerateNoiseMap(scale, exponent);
+        if (temperatureRefinementPass)
+        {
+            if (altitudeMap != null)
+            {
+                temperatureMap = DoTemperatureRefinementPass();
+            }
+            else
+            {
+                Debug.Log("No altitude map generated, skipping temperature refinement pass");
+            }
+        }
+
+        // assign temperature values to tiles here before returning the altitude map
+        foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
+        {
+            grid.FetchTile(entry.Key).SetTemperature(entry.Value);
+        }
+
+        return temperatureMap;
     }
 
     //map generation presets could potentially be expressed as these parameter values
     //i.e. a flatlands map would have a high exponent with low scale
-    public static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    public Dictionary<(int, int, int), float> GenerateNoiseMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
@@ -133,7 +164,7 @@ public static class MapGeneration
     }
 
     // currently the noisemaps generated are rotated counter-clockwise by the angle instead of clockwise
-    public static Dictionary<(int, int, int), float> GenerateNoiseMap(HexGrid grid, float angle, float xScale, float yScale, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
+    public Dictionary<(int, int, int), float> GenerateNoiseMap(float angle, float xScale, float yScale, float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
         float[] amplitudes = new float[amplitudeCount];
@@ -178,7 +209,7 @@ public static class MapGeneration
     }
 
     // varies tile temperatures based on pole and ocean proximity and altitude
-    public static Dictionary<(int, int, int), float> DoTemperatureRefinementPass(HexGrid grid, Dictionary<(int, int, int), float> temperatureMap, Dictionary<(int, int, int), float> altitudeMap, bool warmPoles = false)
+    public Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
     {
         float poleTemp = 0.65f;
         float equatorTemp = 1.35f;
@@ -210,7 +241,7 @@ public static class MapGeneration
         averageTemperature /= newTemperatureMap.Count;
         Debug.Log($"Average temperature of the map: {averageTemperature}");
 
-        MapOceanTiles(grid); // make sure that ocean tiles are actually set
+        MapOceanTiles(); // make sure that ocean tiles are actually set
 
         // modulate the temperature of tiles based on ocean proximity and altitude
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
@@ -258,8 +289,8 @@ public static class MapGeneration
                 }
             }
 
-            float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
-            //float newTemperature = Mathf.Lerp(1f, 0f, 1f - distanceFromNearestOcean);
+            //float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+            float newTemperature = Mathf.Lerp(1f, 0f, 1f - distanceFromNearestOcean);
             //newTemperature = Mathf.Lerp(0f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 3f));
             newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
         }
@@ -267,7 +298,7 @@ public static class MapGeneration
         return newTemperatureMap;
     }
 
-    public static void GenerateTerrainFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
+    public static void GenerateTerrainFeatures()
     {
         //GenerateElevationFeatures(grid, altitudeMap);
         //GenerateWaterBoundary(grid, altitudeMap);
@@ -276,15 +307,14 @@ public static class MapGeneration
         return;
     }
 
-    public static Dictionary<(int, int, int), float> GenerateElevationFeatures(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap, int mountainRangeCount = 3)
+    public Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
     {
         // mountain range generation
-        float mountainScale = 7f, mountainExponent = 1f;
-        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
-        Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(grid, scale: 4f, exponent: 2f);
+        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
+        Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(scale: 4f, exponent: 2f);
         for (int i = 0; i < mountainRangeCount - 1; i++)
         {
-            Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+            Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
             foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
             {
                 (int, int, int) key = entry.Key;
@@ -304,12 +334,13 @@ public static class MapGeneration
             mountainMask[key] = Mathf.Clamp01(tileMountainMask);
         }
 
-        return mountainMask;
+        altitudeMap = mountainMask;
+        return altitudeMap;
     }
 
-    public static Dictionary<(int, int, int), float> GenerateWaterBoundary(HexGrid grid, Dictionary<(int, int, int), float> altitudeMap)
+    public Dictionary<(int, int, int), float> GenerateWaterBoundary()
     {
-        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(grid, scale: 8f);
+        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(scale: 8f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
             int qCoord = entry.Key.Item1;
@@ -328,11 +359,12 @@ public static class MapGeneration
             newAltitudeMap[entry.Key] = shaping;
         }
 
+        this.altitudeMap = newAltitudeMap;
         return newAltitudeMap;
     }
 
     // could potentially generalize this to be type-agnostic instead of requiring a noisemap
-    public static Dictionary<(int, int, int), float> DoCellularAutomataPass(HexGrid grid, Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, int passes = 1)
+    public Dictionary<(int, int, int), float> DoCellularAutomataPass(Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, int passes = 1)
     {
         Dictionary<(int, int, int), float> newNoiseMap = new Dictionary<(int, int, int), float>();
         int tilesWith0Value = 0; // for tracking the number of tiles in the noise map with a value of 0
@@ -390,7 +422,7 @@ public static class MapGeneration
         }
         if (passes > 1)
         {
-            return DoCellularAutomataPass(grid, newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
+            return DoCellularAutomataPass(newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
         }
         else
         {
@@ -401,7 +433,7 @@ public static class MapGeneration
     // altitude seems to be the biggest obstacle for river source candidate spots being found
     // might be fixed after elevation feature generation is implemented
     // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public static List<List<HexTile>> GenerateRivers(HexGrid grid, float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
         List<HexTile> riverSourceCandidates = grid.GetTiles().Where(t => t.GetAltitude() >= minAltitude
                                                 && t.GetTemperature() >= minPrecipitation
@@ -464,8 +496,15 @@ public static class MapGeneration
         return rivers;
     }
 
-    private static void MapOceanTiles(HexGrid grid)
+    private void MapOceanTiles()
     {
+        int oceanTiles = 0;
+        foreach (HexTile tile in grid.GetTiles())
+        {
+            if (tile.terrain == Terrain.Ocean) { oceanTiles++; }
+        }
+        Debug.Log($"Found {oceanTiles} existing ocean tiles");
+
         Debug.Log("Starting ocean mapping...");
         foreach (HexTile tile in grid.borderTiles)
         {
@@ -488,7 +527,7 @@ public static class MapGeneration
     }
 
     // this will need to be rewritten
-    public static void AssignTerrains(HexGrid grid)
+    public void AssignTerrains()
     {
         /*
         if (grid.terrainList == null)

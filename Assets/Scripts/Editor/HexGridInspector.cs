@@ -45,7 +45,7 @@ public class HexGridInspector : Editor
     {
         DrawDefaultInspector();        
         HexGrid grid = (HexGrid)target;
-
+        MapGeneration mapGenerator = new MapGeneration(grid);
         customSeed = EditorGUILayout.IntField("Custom seed", customSeed);
 
         mapGenerationFoldout = EditorGUILayout.Foldout(mapGenerationFoldout, "Map Generation", true);
@@ -71,49 +71,27 @@ public class HexGridInspector : Editor
 
             cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
 
-            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); }
-
+            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); mapGenerator = new MapGeneration(grid); }
             if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
-
             if (GUILayout.Button("Generate Noisemaps"))
             {
+                grid.ResetGrid(); // reset the grid to make sure previous tile values aren't used in this run
+
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
-
-                Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
-                precipitationMap = altitudeMap = temperatureMap = null;
-                if (generatePrecipitationMap) { precipitationMap = MapGeneration.GeneratePrecipitationMap(grid, scale: this.precipitationScale, exponent: this.precipitationExponent); }
-                if (generateAltitudeMap)
-                {
-                    altitudeMap = MapGeneration.GenerateAltitudeMap(grid, scale: this.altitudeScale, exponent: this.altitudeExponent,
-                                    amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures);
-                }
-
-                if (generateTemperatureMap)
-                {
-                    temperatureMap = MapGeneration.GenerateTemperatureMap(grid, scale: this.temperatureScale, exponent: this.temperatureExponent);
-                    try
-                    {
-                        temperatureMap = MapGeneration.DoTemperatureRefinementPass(grid, temperatureMap, altitudeMap);
-                    }
-                    catch (NullReferenceException)
-                    {
-                        //generateTemperatureMap = false;
-                        //temperatureMap = null;
-                        UnityEngine.Debug.Log("No altitude map generated, skipping temperature refinement pass");
-                    }
-                }
-
+                if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
+                if (generateAltitudeMap) { mapGenerator.GenerateAltitudeMap(scale: this.altitudeScale, exponent: this.altitudeExponent,
+                                            amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures); }
+                if (generateTemperatureMap) { mapGenerator.GenerateTemperatureMap(scale: this.temperatureScale, exponent: this.temperatureExponent); }
                 
                 foreach (HexTile tile in grid.GetTiles())
                 {
-                    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
+                    //(int, int, int) coordinates = tile.GetCoordinates().ToTuple();
 
                     float precipitation, temperature, altitude;
                     precipitation = temperature = altitude = 0f;
-                    if (generatePrecipitationMap) { precipitation = precipitationMap[coordinates]; }
-                    if (generateAltitudeMap) { altitude = altitudeMap[coordinates]; }
-                    if (generateTemperatureMap) { temperature = temperatureMap[coordinates]; }
-                    tile.SetBiomeAttributes(precipitation, altitude, temperature);
+                    if (generatePrecipitationMap) { precipitation = tile.GetPrecipitation(); }
+                    if (generateAltitudeMap) { altitude = tile.GetAltitude(); }
+                    if (generateTemperatureMap) { temperature = tile.GetTemperature(); }
 
                     Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
                     if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
@@ -162,55 +140,9 @@ public class HexGridInspector : Editor
                     }
                 }
 
-                //foreach (HexTile tile in grid.GetTiles())
-                //{
-                //    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
-
-                //    float precipitation, temperature, altitude;
-                //    precipitation = temperature = altitude = 0f;
-                //    if (generatePrecipitationMap) { precipitation = precipitationMap[coordinates]; }
-                //    if (generateAltitudeMap) { altitude = altitudeMap[coordinates]; }
-                //    if (generateTemperatureMap) { temperature = temperatureMap[coordinates]; }
-                //    tile.SetBiomeAttributes(precipitation, altitude, temperature);
-
-                //    if (precipitation > 1f || altitude > 1f || temperature > 1f) // tiles that break the 0 - 1 normalization are coloured pure white
-                //    {
-                //        tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                //    }
-                //    else
-                //    {
-                //        if (altitude <= grid.waterLevel && generateAltitudeMap) // water level, might need tweaking
-                //        {
-                //            Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
-                //            tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
-                //        }
-                //        else if (altitude >= 0.7f && generateAltitudeMap)
-                //        {
-                //            if (altitude >= 0.9f && generateAltitudeMap)
-                //            {
-                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                //            }
-                //            else if (altitude >= 0.8f && generateAltitudeMap)
-                //            {
-                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
-                //            }
-                //            else
-                //            {
-                //                tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
-                //            }
-                //        }
-                //        else
-                //        {
-                //            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, 1f - temperature);
-                //            //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, altitude, precipitation);
-                //            //tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f - altitude, altitude, 0f);
-                //        }
-                //    }
-                //}
-
                 if (generateRivers)
                 {
-                    grid.rivers = MapGeneration.GenerateRivers(grid);
+                    grid.rivers = mapGenerator.GenerateRivers();
                     foreach (List<HexTile> river in grid.rivers)
                     {
                         for (int i = 0; i < river.Count; i++)
@@ -240,7 +172,7 @@ public class HexGridInspector : Editor
                 {
                     altitudeMap.Add(tile.GetCoordinates().ToTuple(), tile.GetAltitude());
                 }
-                altitudeMap = MapGeneration.DoCellularAutomataPass(grid, altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
+                altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
 
                 foreach (HexTile tile in grid.GetTiles())
                 {
@@ -284,9 +216,17 @@ public class HexGridInspector : Editor
             singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
             averageElevationFeatures = EditorGUILayout.Toggle("Elevation features by average", averageElevationFeatures);
 
-            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); }
+            if (GUILayout.Button("Generate Grid"))
+            {
+                mapGenerator = new MapGeneration(grid);
+                GenerateGrid(grid);
+            }
 
-            if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
+            if (GUILayout.Button("Clear Grid"))
+            {
+                mapGenerator = new MapGeneration(grid);
+                ClearGrid(grid);
+            }
 
             if (GUILayout.Button("Generate Mountain Ranges"))
             {
@@ -298,7 +238,7 @@ public class HexGridInspector : Editor
                 for(int i = 0; i < mountainRangeCount; i++)
                 {
                     float angle = mountainAngle * (i + 1); // makes following mountain ranges rotate relative to the initial mountain range
-                    Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid: grid, angle: angle, xScale: mountainXScale, yScale: mountainYScale, scale: mountainScale, exponent: mountainExponent);
+                    Dictionary<(int, int, int), float> mountainMask = mapGenerator.GenerateNoiseMap(angle: angle, xScale: mountainXScale, yScale: mountainYScale, scale: mountainScale, exponent: mountainExponent);
 
                     foreach (HexTile tile in tiles)
                     {
@@ -356,12 +296,12 @@ public class HexGridInspector : Editor
             {
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
-                Dictionary<(int, int, int), float> mountainMask = MapGeneration.GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
-                Dictionary<(int, int, int), float> mixValueMask = MapGeneration.GenerateNoiseMap(grid, scale: 4f, exponent: 2f);
+                Dictionary<(int, int, int), float> mountainMask = mapGenerator.GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
+                Dictionary<(int, int, int), float> mixValueMask = mapGenerator.GenerateNoiseMap(scale: 4f, exponent: 2f);
                 for (int i = 0; i < mountainRangeCount - 1; i++)
                 {
                     Debug.Log($"Generating mountain range {i}");
-                    Dictionary<(int, int, int), float> newMountainMask = MapGeneration.GenerateNoiseMap(grid, scale: mountainScale, exponent: mountainExponent);
+                    Dictionary<(int, int, int), float> newMountainMask = mapGenerator.GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
                     foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
                     {
                         (int, int, int) key = entry.Key;
@@ -425,31 +365,11 @@ public class HexGridInspector : Editor
 
     static void GenerateGrid(HexGrid grid)
     {
-        if (grid.tiles.Count == 0)
-        {
-            grid.Initialize();
-        }
-        else
-        {
-            grid.RegenerateGrid();
-        }
+        grid.Initialize();
     }
 
     static void ClearGrid(HexGrid grid)
     {
-        grid.borderTiles.Clear();
-        if (grid.tiles.Count != 0)
-        {
-            foreach (HexTile tile in grid.tiles.Values)
-            {
-                DestroyImmediate(tile.gameObject);
-            }
-            grid.tiles.Clear();
-        }
-
-        foreach (HexTile tile in grid.GetComponentsInChildren<HexTile>())
-        {
-            DestroyImmediate(tile.gameObject);
-        }
+        grid.DestroyGrid();
     }
 }
