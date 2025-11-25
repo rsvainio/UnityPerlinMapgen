@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class HexTile : MonoBehaviour
@@ -69,6 +70,22 @@ public class HexTile : MonoBehaviour
         }
 
         return neighbors;
+    }
+
+    // returns a list of each HexTile that is at most a distance of range from this tile
+    public List<HexTile> GetTilesAtRange(int range)
+    {
+        List<HexTile> results = new List<HexTile>();
+        for (int q = -range; q <= range; q++)
+        {
+            for (int r = Mathf.Max(-range, -q - range); r <= Mathf.Min(range, -q + range); r++)
+            {
+                int s = -q - r;
+                results.Add(grid.FetchTile((q, r, s)));
+            }
+        }
+
+        return results;
     }
 
     //returns an array consisting of the coordinates of neighboring hexTiles
