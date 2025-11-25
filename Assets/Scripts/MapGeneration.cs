@@ -22,6 +22,7 @@ public class MapGeneration
 {
     readonly HexGrid grid;
     public Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
+    private Dictionary<(int, int, int), float> oceanDistanceMap;
 
     public MapGeneration(HexGrid grid)
     {
@@ -82,11 +83,11 @@ public class MapGeneration
 
         if (generateElevationFeatures)
         {
-            altitudeMap = GenerateElevationFeatures();
+            GenerateElevationFeatures();
         }
 
         // water boundary generation
-        altitudeMap = GenerateWaterBoundary();
+        GenerateWaterBoundary();
 
         altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
         altitudeMap = DoCellularAutomataPass(altitudeMap, 0.7f, passes: 2); // mountain level cellular automata pass
@@ -107,7 +108,7 @@ public class MapGeneration
         {
             if (altitudeMap != null)
             {
-                temperatureMap = DoTemperatureRefinementPass();
+                DoTemperatureRefinementPass();
             }
             else
             {
@@ -209,7 +210,7 @@ public class MapGeneration
     }
 
     // varies tile temperatures based on pole and ocean proximity and altitude
-    public Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
+    private Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
     {
         float poleTemp = 0.65f;
         float equatorTemp = 1.35f;
@@ -247,54 +248,19 @@ public class MapGeneration
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
         {
             (int, int, int) key = entry.Key;
-            float originalTemperature = newTemperatureMap[key];
-            float distanceFromNearestOcean = 1f;
             HexTile tile = grid.FetchTile(key);
-
             if (tile.terrain != Terrain.Ocean)
-            {   
-                // do a breadth-first search to make sure that it is actually the nearest ocean tile that is found
-                Queue<HexTile> tileQueue = new Queue<HexTile>();
-                Dictionary<(int, int, int), bool> exploredTiles = new Dictionary<(int, int, int), bool>();
+            {
+                float originalTemperature = newTemperatureMap[key];
+                float distanceFromNearestOcean = oceanDistanceMap[key];
 
-                foreach(HexTile neighborTile in tile.GetNeighbors())
-                {
-                    tileQueue.Enqueue(neighborTile);
-                    exploredTiles[neighborTile.GetCoordinates().ToTuple()] = true;
-                }
-
-                while (tileQueue.Count > 0)
-                {
-                    HexTile neighborTile = tileQueue.Dequeue();
-                    if (neighborTile.terrain == Terrain.Ocean)
-                    {
-                        float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
-                        float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
-                        distanceFromNearestOcean = tileDistance / maxDistance;
-
-                        tileQueue.Clear();
-                    }
-                    else
-                    {
-                        foreach (HexTile tileToExplore in neighborTile.GetNeighbors())
-                        {
-                            (int, int, int) coordinateTuple = tileToExplore.GetCoordinates().ToTuple();
-                            bool explored = exploredTiles.TryGetValue(coordinateTuple, out bool value);
-                            if (explored) { continue; }
-
-                            tileQueue.Enqueue(tileToExplore);
-                            exploredTiles[coordinateTuple] = true;
-                        }
-                    }
-                }
+                float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+                newTemperature = Mathf.Lerp(newTemperature / 1.5f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 2f));
+                newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
             }
-
-            //float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
-            float newTemperature = Mathf.Lerp(1f, 0f, 1f - distanceFromNearestOcean);
-            //newTemperature = Mathf.Lerp(0f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 3f));
-            newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
         }
 
+        temperatureMap = newTemperatureMap;
         return newTemperatureMap;
     }
 
@@ -307,7 +273,7 @@ public class MapGeneration
         return;
     }
 
-    public Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
+    private Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
     {
         // mountain range generation
         Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
@@ -338,7 +304,7 @@ public class MapGeneration
         return altitudeMap;
     }
 
-    public Dictionary<(int, int, int), float> GenerateWaterBoundary()
+    private Dictionary<(int, int, int), float> GenerateWaterBoundary()
     {
         Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(scale: 8f);
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
@@ -359,7 +325,7 @@ public class MapGeneration
             newAltitudeMap[entry.Key] = shaping;
         }
 
-        this.altitudeMap = newAltitudeMap;
+        altitudeMap = newAltitudeMap;
         return newAltitudeMap;
     }
 
@@ -498,13 +464,6 @@ public class MapGeneration
 
     private void MapOceanTiles()
     {
-        int oceanTiles = 0;
-        foreach (HexTile tile in grid.GetTiles())
-        {
-            if (tile.terrain == Terrain.Ocean) { oceanTiles++; }
-        }
-        Debug.Log($"Found {oceanTiles} existing ocean tiles");
-
         Debug.Log("Starting ocean mapping...");
         foreach (HexTile tile in grid.borderTiles)
         {
@@ -523,7 +482,59 @@ public class MapGeneration
             }
         }
 
+        if (oceanDistanceMap.Count == 0)
+        {
+            CalculateOceanDistances();
+        }
+
         return;
+    }
+
+    // does a breadth-first search for each non-oceanic tile to find the distance between it and the nearest oceanic tile
+    // this should obviously only be run after checking which tiles are oceanic
+    private void CalculateOceanDistances()
+    {
+        foreach (HexTile tile in grid.GetTiles())
+        {
+            float distanceFromNearestOcean;
+            if (tile.terrain != Terrain.Ocean)
+            {
+                // do a breadth-first search to make sure that it is actually the nearest ocean tile that is found
+                Queue<HexTile> tileQueue = new Queue<HexTile>();
+                Dictionary<(int, int, int), bool> exploredTiles = new Dictionary<(int, int, int), bool>();
+
+                foreach (HexTile neighborTile in tile.GetNeighbors())
+                {
+                    tileQueue.Enqueue(neighborTile);
+                    exploredTiles[neighborTile.GetCoordinates().ToTuple()] = true;
+                }
+
+                while (tileQueue.Count > 0)
+                {
+                    HexTile neighborTile = tileQueue.Dequeue();
+                    if (neighborTile.terrain == Terrain.Ocean)
+                    {
+                        float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
+                        float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
+                        distanceFromNearestOcean = tileDistance / maxDistance;
+
+                        tileQueue.Clear();
+                    }
+                    else
+                    {
+                        foreach (HexTile tileToExplore in neighborTile.GetNeighbors())
+                        {
+                            (int, int, int) coordinateTuple = tileToExplore.GetCoordinates().ToTuple();
+                            bool explored = exploredTiles.TryGetValue(coordinateTuple, out bool value);
+                            if (explored) { continue; }
+
+                            tileQueue.Enqueue(tileToExplore);
+                            exploredTiles[coordinateTuple] = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // this will need to be rewritten
