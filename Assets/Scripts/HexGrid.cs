@@ -9,7 +9,6 @@ using UnityEngine.UI;
 public class HexGrid : MonoBehaviour
 {
     public int width, height;
-    public int widthMax, widthMin, heightMax, heightMin;
     public Color defaultColor = Color.white;
     public Color touchedColor = Color.magenta;
     public HexTile tilePrefab;
@@ -129,8 +128,7 @@ public class HexGrid : MonoBehaviour
         int bottomBound =   (int) (height) / 2;
         int topBound =      (int)-(height - 1 - bottomBound);
 
-        Debug.Assert((Math.Abs(leftBound) + rightBound == width - 1) || (Math.Abs(topBound) + bottomBound == height - 1)); // replaces Exception throw below
-        //if ((Math.Abs(leftBound) + rightBound != width - 1) || (Math.Abs(topBound) + bottomBound != height - 1)) throw new Exception("Map boundary mismatch");
+        Debug.Assert((Math.Abs(leftBound) + rightBound == width - 1) || (Math.Abs(topBound) + bottomBound == height - 1));
         Debug.Log("Generating grid with bounds " + leftBound + ", " + rightBound + ", " + topBound + ", " + bottomBound);
 
         HexTile tile;
@@ -143,23 +141,16 @@ public class HexGrid : MonoBehaviour
             for (int r = topBound - qOff; r <= bottomBound - qOff; r++)
             {
                 int s = -q - r;
-                Debug.Assert((q + r + s == 0)); // replaces Exception throw below
-                //if (q + r + s != 0) throw new Exception("Hex coordinate sum not equal to 0");
-                position.x = hexRadius * 3.0f / 2.0f * q;
+                Debug.Assert((q + r + s == 0));
 
-                // should look into reversing this and using the original equation
-                // currently R is negative on the upper bound and positive on the lower bound, which is counter-intuitive
-                position.z = hexRadius * Mathf.Sqrt(3.0f) * (-r + -q / 2.0f); //original equation was (hexRadius * Mathf.Sqrt(3.0f) * (r + q / 2.0f)) but it resulted in the r and s coordinates being reversed
-                
-                tile = CreateTile(position, q, r, s);
-                tiles.Add((q, r, s), tile);
+                position.x = hexRadius * 3.0f / 2.0f * q;
+                position.z = (hexRadius * Mathf.Sqrt(3.0f) * (r + q / 2.0f));
+                tile = CreateTile(position, q, s, r);
+                tiles.Add((q, s, r), tile);
+                // the above SHOULD be given as (q, r, s), but the current order results in being able to use the original equation of hexRadius * Mathf.Sqrt(3.0f) * (r + q / 2.0f) for calculating the z position
+                // instead of the previously used hexRadius * Mathf.Sqrt(3.0f) * (-r + -q / 2.0f). This likely shouldn't cause issues since the only thing that matters is that the coordinates stay consistent
             }
         }
-
-        widthMax = rightBound;
-        widthMin = leftBound;
-        heightMax = bottomBound;
-        heightMin = topBound;
 
         Debug.Log("Generated " + tiles.Count + " tiles");
     }
@@ -191,103 +182,40 @@ public class HexGrid : MonoBehaviour
         List<Color> colors = new List<Color>();
         List<Vector2> uvs = new List<Vector2>();
 
-        //the corners are in reverse order, should probably fix this - reversing the array works though
-        foreach (Vector3 vert in HexMetrics.cornersFlat.Reverse()) {
-            verts.Add(vert);
-        }
-
-        tris.Add(0);
-        tris.Add(2);
-        tris.Add(1);
-
-        tris.Add(0);
-        tris.Add(5);
-        tris.Add(2);
-
-        tris.Add(2);
-        tris.Add(5);
-        tris.Add(3);
-
-        tris.Add(3);
-        tris.Add(5);
-        tris.Add(4);
-
-        for(int i = 0; i < 6; i++)
-        {
-            colors.Add(defaultColor);
-        }
-
-        uvs.Add(new Vector2(0.5f, 1f));
-        uvs.Add(new Vector2(1, 0.75f));
-        uvs.Add(new Vector2(1, 0.25f));
-        uvs.Add(new Vector2(0.5f, 0));
-        uvs.Add(new Vector2(0, 0.25f));
-        uvs.Add(new Vector2(0, 0.75f));
-
-        mesh.vertices = verts.ToArray();
-        mesh.triangles = tris.ToArray();
-        mesh.colors = colors.ToArray();
-        mesh.uv = uvs.ToArray();
-
-        mesh.name = "Hexagonal Tile";
-
-        mesh.RecalculateNormals();
-        hexMesh = mesh;
-    }
-
-    private Mesh GenerateHexMesh(Color color)
-    {
-        Mesh mesh = new Mesh();
-
-        List<Vector3> verts = new List<Vector3>();
-        List<int> tris = new List<int>();
-        List<Color> colors = new List<Color>();
-        List<Vector2> uvs = new List<Vector2>();
-
-        //the corners are in reverse order, should probably fix this - reversing the array works though
-        foreach (Vector3 vert in HexMetrics.cornersFlat.Reverse())
-        {
-            verts.Add(vert);
-        }
-
-        tris.Add(0);
-        tris.Add(2);
-        tris.Add(1);
-
-        tris.Add(0);
-        tris.Add(5);
-        tris.Add(2);
-
-        tris.Add(2);
-        tris.Add(5);
-        tris.Add(3);
-
-        tris.Add(3);
-        tris.Add(5);
-        tris.Add(4);
-
+        // iterate through each triangle of the cell
         for (int i = 0; i < 6; i++)
         {
-            colors.Add(color);
+            AddTriangle(HexMetrics.cornersFlat[i], HexMetrics.cornersFlat[i + 1]);
         }
 
-        uvs.Add(new Vector2(0.5f, 1f));
-        uvs.Add(new Vector2(1, 0.75f));
-        uvs.Add(new Vector2(1, 0.25f));
-        uvs.Add(new Vector2(0.5f, 0));
-        uvs.Add(new Vector2(0, 0.25f));
-        uvs.Add(new Vector2(0, 0.75f));
+        //uvs.Add(new Vector2(0.5f, 1f));
+        //uvs.Add(new Vector2(1, 0.75f));
+        //uvs.Add(new Vector2(1, 0.25f));
+        //uvs.Add(new Vector2(0.5f, 0));
+        //uvs.Add(new Vector2(0, 0.25f));
+        //uvs.Add(new Vector2(0, 0.75f));
 
         mesh.vertices = verts.ToArray();
         mesh.triangles = tris.ToArray();
         mesh.colors = colors.ToArray();
-        mesh.uv = uvs.ToArray();
-
-        mesh.name = "Hexagonal Tile";
-
+        //mesh.uv = uvs.ToArray();
+        mesh.name = "Hex Tile";
         mesh.RecalculateNormals();
-        return mesh;
-        //hexMesh = mesh;
+        hexMesh = mesh;
+
+        void AddTriangle(Vector3 v2, Vector3 v3)
+        {
+            int vertexIndex = verts.Count;
+            verts.Add(Vector3.zero); // center of the hex
+            verts.Add(v2);
+            verts.Add(v3);
+            tris.Add(vertexIndex);
+            tris.Add(vertexIndex + 1);
+            tris.Add(vertexIndex + 2);
+            colors.Add(defaultColor);
+            colors.Add(defaultColor);
+            colors.Add(defaultColor);
+        }
     }
 
     private void BuildBorderTileList()

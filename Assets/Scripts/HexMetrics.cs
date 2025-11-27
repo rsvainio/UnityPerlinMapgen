@@ -1,3 +1,4 @@
+using System.Xml;
 using UnityEngine;
 
 public static class HexMetrics
@@ -13,6 +14,7 @@ public static class HexMetrics
         new Vector3(-0.5f * outerRadius, 0f, -innerRadius),
         new Vector3(-outerRadius, 0f, 0f),
         new Vector3(-0.5f * outerRadius, 0f, innerRadius),
+        new Vector3(0.5f * outerRadius, 0f, innerRadius),
     };
 
     //pointy-top
@@ -30,4 +32,18 @@ public static class HexMetrics
         new(0, -1, 1), new(1, -1, 0), new(1, 0, -1),
         new(0, 1, -1), new(-1, 1, 0), new(-1, 0, 1)
     };
+
+    // currently only used for wind direction
+    public static Vector3 degreesToHexDirection(int angle)
+    {
+        float radians = angle * Mathf.Deg2Rad;
+        float vx = Mathf.Cos(radians);
+        float vy = Mathf.Sin(radians);
+
+        float q = vx;
+        float r = (Mathf.Sqrt(3f) / 2f) * vy - 0.5f * vx;
+        float s = -q - r;
+
+        return new Vector3(q, r, s).normalized;
+    }
 }
