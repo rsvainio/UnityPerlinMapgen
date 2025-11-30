@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Text;
+using Unity.VisualScripting;
 using UnityEngine;
 using Random = UnityEngine.Random;
+using Vector3 = UnityEngine.Vector3;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -22,7 +26,8 @@ public class MapGeneration
 {
     readonly HexGrid grid;
     public Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
-    private Dictionary<(int, int, int), float> oceanDistanceMap;
+    private Dictionary<(int, int, int), int> oceanDistanceMap = new();
+    private HexCoordinates windDirection;
 
     public MapGeneration(HexGrid grid)
     {
@@ -54,9 +59,11 @@ public class MapGeneration
     }
     */
 
+    // should reorganize these to have altitude be the first function as precipitation and temperature generation are dependent on it
     public Dictionary<(int, int, int), float> GeneratePrecipitationMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
     {   
-        precipitationMap = GenerateNoiseMap(scale, exponent);
+        //precipitationMap = GenerateNoiseMap(scale, exponent);
+        precipitationMap = SimulateRainShadow();
 
         // assign precipitation values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in precipitationMap)
@@ -98,6 +105,7 @@ public class MapGeneration
             grid.FetchTile(entry.Key).SetAltitude(entry.Value);
         }
 
+        CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
         return altitudeMap;
     }
 
@@ -242,8 +250,6 @@ public class MapGeneration
         averageTemperature /= newTemperatureMap.Count;
         Debug.Log($"Average temperature of the map: {averageTemperature}");
 
-        MapOceanTiles(); // make sure that ocean tiles are actually set
-
         // modulate the temperature of tiles based on ocean proximity and altitude
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
         {
@@ -252,7 +258,8 @@ public class MapGeneration
             if (tile.terrain != Terrain.Ocean)
             {
                 float originalTemperature = newTemperatureMap[key];
-                float distanceFromNearestOcean = oceanDistanceMap[key];
+                float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
+                float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
 
                 float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
                 newTemperature = Mathf.Lerp(newTemperature / 1.5f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 2f));
@@ -329,71 +336,117 @@ public class MapGeneration
         return newAltitudeMap;
     }
 
-    // could potentially generalize this to be type-agnostic instead of requiring a noisemap
-    public Dictionary<(int, int, int), float> DoCellularAutomataPass(Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, int passes = 1)
+    public Dictionary<(int, int, int), float> SimulateRainShadow()
     {
-        Dictionary<(int, int, int), float> newNoiseMap = new Dictionary<(int, int, int), float>();
-        int tilesWith0Value = 0; // for tracking the number of tiles in the noise map with a value of 0
+        Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
+        Debug.Log($"Wind direction: {windDirection.ToString()}");
+        List<HexTile> sortedTiles = grid.GetTiles()
+            .OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
+            .ToList();
 
-        foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
+        // set initial moisture values for each tile before simulating the effect of rain shadow
+        Dictionary<(int, int, int), float> rainShadowMap = new Dictionary<(int, int, int), float>();
+        foreach (HexTile tile in sortedTiles)
         {
-            (int, int, int) key = entry.Key;
-            HexTile tile = grid.FetchTile(key);
-            if (entry.Value == 0f) { tilesWith0Value++; }
-
-            int neighborBoundaryTiles = 0;
-            float tileNewValue = 0f; // the new value to which the tile will be set to if transitioned
-            HexTile[] neighborTiles = tile.GetNeighbors();
-            if (noiseMap[key] > boundary)
+            (int, int, int) key = tile.GetCoordinates().ToTuple();
+            float startingPrecipitation = 0;
+            if (tile.terrain == Terrain.Ocean)
             {
-                foreach (HexTile neighborTile in neighborTiles)
-                {
-                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (value <= boundary)
-                    {
-                        neighborBoundaryTiles++;
-                        tileNewValue += value;
-                    }
-                }
+                startingPrecipitation = 1f;
+            }
+            else if (tile.terrain == Terrain.FreshWater)
+            {
+                startingPrecipitation = 0.5f; // this value will need to be tweaked
             }
             else
             {
-                foreach (HexTile neighborTile in neighborTiles)
+                float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
+                float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
+                startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
+            }
+            rainShadowMap[key] = startingPrecipitation;
+        }
+
+        // calculate how perpendicular each neighbor hex's vector is relative to the wind direction
+        float[] neighborWindDots = new float[HexMetrics.neighborVectors.Length];
+        float downwindDiffusion = 0.3f;
+        float sidewindDiffusion = 0.1f;
+        for (int i = 0; i < HexMetrics.neighborVectors.Length; i++)
+        {
+            float dotProduct = Vector3.Dot(HexMetrics.neighborVectors[i].ToVec3(), windDirection);
+            neighborWindDots[i] = Mathf.Lerp(sidewindDiffusion, downwindDiffusion, 1f - Mathf.Abs(dotProduct));
+        }
+        
+        // simulate rain shadow for each tile
+        foreach (HexTile tile in sortedTiles)
+        {
+            (int, int, int) key = tile.GetCoordinates().ToTuple();
+            float incoming = rainShadowMap[key];
+            float precipitationSum = 0;
+            HexTile[] neighbors = tile.GetNeighbors();
+            for (int i = 0; i < neighbors.Length; i++)
+            {
+                precipitationSum += rainShadowMap[neighbors[i].GetCoordinates().ToTuple()] * neighborWindDots[i];
+            }
+            incoming += precipitationSum / neighbors.Length - incoming;
+
+            Vector3 neighborVector = windDirection + tile.GetCoordinates().ToVec3();
+            int q = Mathf.RoundToInt(neighborVector.x);
+            int r = Mathf.RoundToInt(neighborVector.y);
+            int s = Mathf.RoundToInt(neighborVector.z);
+            if (grid.tiles.TryGetValue((q, r, s), out HexTile downwind))
+            {
+                float heightDiff = downwind.GetAltitude() - tile.GetAltitude();
+                if (heightDiff > 0)
                 {
-                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
-                    if (value > boundary)
-                    {
-                        neighborBoundaryTiles++;
-                        tileNewValue += value;
-                    }
+                    float rain = incoming * (heightDiff * 1.5f);
+                    rainShadowMap[key] += rain;
+                    incoming -= rain;
                 }
-            }
+                else
+                {
+                    incoming += heightDiff * 0.2f;
+                }
 
-            int neighborTileReq = neighborTiles.Length == 6 ? neighborTilesForTransition : (int)Mathf.Round(neighborTilesForTransition * (neighborTiles.Length / 6f));
-            if (neighborBoundaryTiles > neighborTileReq)
-            {
-                tileNewValue /= neighborBoundaryTiles;
-                newNoiseMap[key] = tileNewValue;
-            }
-            else
-            {
-                newNoiseMap[key] = noiseMap[key];
+                incoming = Mathf.Clamp01(incoming);
+
+                (int, int, int) downWindKey = downwind.GetCoordinates().ToTuple();
+                rainShadowMap[downWindKey] = Mathf.Max(rainShadowMap[downWindKey], incoming);
             }
         }
 
-        Debug.Assert(newNoiseMap.Count == noiseMap.Count, $"Generated only {newNoiseMap.Count} tiles out of the required {noiseMap.Count}", grid);
-        if (tilesWith0Value > grid.height * grid.width * 0.1f)
-        {
-            Debug.LogWarning($"Found {tilesWith0Value} tiles with an initial value of 0, parameter noise map may not be initialized correctly", grid);
-        }
-        if (passes > 1)
-        {
-            return DoCellularAutomataPass(newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
-        }
-        else
-        {
-            return newNoiseMap;
-        }
+        //foreach (HexTile tile in sortedTiles)
+        //{
+        //    (int, int, int) key = tile.GetCoordinates().ToTuple();
+        //    float incoming = rainShadowMap[key];
+
+        //    Vector3 neighborVector = windDirection + tile.GetCoordinates().ToVec3();
+        //    int q = Mathf.RoundToInt(neighborVector.x);
+        //    int r = Mathf.RoundToInt(neighborVector.y);
+        //    int s = Mathf.RoundToInt(neighborVector.z);
+        //    if (grid.tiles.TryGetValue((q, r, s), out HexTile downwind))
+        //    {
+        //        float heightDiff = downwind.GetAltitude() - tile.GetAltitude();
+        //        if (heightDiff > 0)
+        //        {
+        //            float rain = incoming * (heightDiff * 1.5f);
+        //            rainShadowMap[key] += rain;
+        //            incoming -= rain;
+        //        }
+        //        else
+        //        {
+        //            incoming += heightDiff * 0.2f;
+        //        }
+
+        //        incoming = Mathf.Clamp01(incoming);
+
+        //        (int, int, int) downWindKey = downwind.GetCoordinates().ToTuple();
+        //        rainShadowMap[downWindKey] = Mathf.Max(rainShadowMap[downWindKey], incoming);
+        //    }
+        //}
+
+        precipitationMap = rainShadowMap;
+        return rainShadowMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
@@ -462,14 +515,16 @@ public class MapGeneration
         return rivers;
     }
 
-    private void MapOceanTiles()
+    // this might need rivers added to it as well
+    private void CategorizeWaterTiles()
     {
+        // assign terrain to oceanic water tiles
         Debug.Log("Starting ocean mapping...");
         foreach (HexTile tile in grid.borderTiles)
         {
             DoOceanMappingRecursion(tile);
         }
-        
+
         void DoOceanMappingRecursion(HexTile tile)
         {
             if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
@@ -487,6 +542,15 @@ public class MapGeneration
             CalculateOceanDistances();
         }
 
+        // assign terrain to non-oceanic water tiles
+        foreach (HexTile tile in grid.GetTiles())
+        {
+            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
+            {
+                tile.SetTerrain(Terrain.FreshWater);
+            }
+        }
+
         return;
     }
 
@@ -496,7 +560,7 @@ public class MapGeneration
     {
         foreach (HexTile tile in grid.GetTiles())
         {
-            float distanceFromNearestOcean;
+            int distanceFromNearestOcean = 0;
             if (tile.terrain != Terrain.Ocean)
             {
                 // do a breadth-first search to make sure that it is actually the nearest ocean tile that is found
@@ -514,9 +578,10 @@ public class MapGeneration
                     HexTile neighborTile = tileQueue.Dequeue();
                     if (neighborTile.terrain == Terrain.Ocean)
                     {
-                        float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
-                        float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
-                        distanceFromNearestOcean = tileDistance / maxDistance;
+                        distanceFromNearestOcean = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
+                        //float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
+                        //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
+                        //distanceFromNearestOcean = tileDistance / maxDistance;
 
                         tileQueue.Clear();
                     }
@@ -534,6 +599,75 @@ public class MapGeneration
                     }
                 }
             }
+
+            oceanDistanceMap[tile.GetCoordinates().ToTuple()] = distanceFromNearestOcean;
+        }
+    }
+
+    // could potentially generalize this to be type-agnostic instead of requiring a noisemap
+    public Dictionary<(int, int, int), float> DoCellularAutomataPass(Dictionary<(int, int, int), float> noiseMap, float boundary, int neighborTilesForTransition = 4, int passes = 1)
+    {
+        Dictionary<(int, int, int), float> newNoiseMap = new Dictionary<(int, int, int), float>();
+        int tilesWith0Value = 0; // for tracking the number of tiles in the noise map with a value of 0
+
+        foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
+        {
+            (int, int, int) key = entry.Key;
+            HexTile tile = grid.FetchTile(key);
+            if (entry.Value == 0f) { tilesWith0Value++; }
+
+            int neighborBoundaryTiles = 0;
+            float tileNewValue = 0f; // the new value to which the tile will be set to if transitioned
+            HexTile[] neighborTiles = tile.GetNeighbors();
+            if (noiseMap[key] > boundary)
+            {
+                foreach (HexTile neighborTile in neighborTiles)
+                {
+                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (value <= boundary)
+                    {
+                        neighborBoundaryTiles++;
+                        tileNewValue += value;
+                    }
+                }
+            }
+            else
+            {
+                foreach (HexTile neighborTile in neighborTiles)
+                {
+                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    if (value > boundary)
+                    {
+                        neighborBoundaryTiles++;
+                        tileNewValue += value;
+                    }
+                }
+            }
+
+            int neighborTileReq = neighborTiles.Length == 6 ? neighborTilesForTransition : (int)Mathf.Round(neighborTilesForTransition * (neighborTiles.Length / 6f));
+            if (neighborBoundaryTiles > neighborTileReq)
+            {
+                tileNewValue /= neighborBoundaryTiles;
+                newNoiseMap[key] = tileNewValue;
+            }
+            else
+            {
+                newNoiseMap[key] = noiseMap[key];
+            }
+        }
+
+        Debug.Assert(newNoiseMap.Count == noiseMap.Count, $"Generated only {newNoiseMap.Count} tiles out of the required {noiseMap.Count}", grid);
+        if (tilesWith0Value > grid.height * grid.width * 0.1f)
+        {
+            Debug.LogWarning($"Found {tilesWith0Value} tiles with an initial value of 0, parameter noise map may not be initialized correctly", grid);
+        }
+        if (passes > 1)
+        {
+            return DoCellularAutomataPass(newNoiseMap, boundary, neighborTilesForTransition, passes - 1);
+        }
+        else
+        {
+            return newNoiseMap;
         }
     }
 
