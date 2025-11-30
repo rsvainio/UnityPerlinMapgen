@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using TreeEditor;
 using UnityEditor;
 using UnityEngine;
 
@@ -78,11 +79,11 @@ public class HexGridInspector : Editor
                 grid.ResetGrid(); // reset the grid to make sure previous tile values aren't used in this run
 
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
-                if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
                 if (generateAltitudeMap) { mapGenerator.GenerateAltitudeMap(scale: this.altitudeScale, exponent: this.altitudeExponent,
                                             amplitudeCount: this.altitudeAmplitudes, generateElevationFeatures: this.generateElevationFeatures); }
+                if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
                 if (generateTemperatureMap) { mapGenerator.GenerateTemperatureMap(scale: this.temperatureScale, exponent: this.temperatureExponent); }
-                
+
                 foreach (HexTile tile in grid.GetTiles())
                 {
                     //(int, int, int) coordinates = tile.GetCoordinates().ToTuple();
@@ -96,6 +97,8 @@ public class HexGridInspector : Editor
                     Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
                     if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
 
+                    // tile color assignment
+                    Color colorBlend = new Color(0f, 0f, 0f);
                     if (generateAltitudeMap)
                     {
                         Color altitudeColor;
@@ -124,20 +127,19 @@ public class HexGridInspector : Editor
                             altitudeColor = new Color(0f, altitude, 0f);
                         }
 
-                        tileMaterial.SetColor("_Color", altitudeColor);
+                        colorBlend += altitudeColor;
                     }
 
                     if (generateTemperatureMap)
                     {
-                        Color colorBlend = tileMaterial.GetColor("_Color") + new Color(temperature, 0f, 0f);
-                        tileMaterial.SetColor("_Color", colorBlend);
+                        colorBlend += tileMaterial.GetColor("_Color") + new Color(temperature, 0f, 0f);
                     }
 
                     if (generatePrecipitationMap)
                     {
-                        Color colorBlend = tileMaterial.GetColor("_Color") + new Color(0f, 0f, precipitation);
-                        tileMaterial.SetColor("_Color", colorBlend);
+                        colorBlend += tileMaterial.GetColor("_Color") + new Color(0f, 0f, precipitation);
                     }
+                    tileMaterial.SetColor("_Color", colorBlend);
                 }
 
                 if (generateRivers)
@@ -153,16 +155,24 @@ public class HexGridInspector : Editor
                     }
                 }
 
-                //MapGeneration.AssignTerrains(grid);
+                ////testing rain shadow calculation
+                //Vector3 windDirection = HexMetrics.ConvertDegreesToVector(90);
+                //Debug.Log($"Wind direction: {windDirection.ToString()}");
+                //List<HexTile> sortedTiles = grid.GetTiles()
+                //.OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection))
+                //.ToList();
 
-                /*foreach (HexTile tile in grid.tiles.Values)
-                {
-                    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
-                    float temperature = temperatureMap[coordinates];
-                    float altitude = altitudeMap[coordinates];
-                    tile.SetBiomeAttributes(0, altitude, temperature);
-                    tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(temperature, 0f, 1f - temperature * 0.8f);
-                }*/
+                //int n = 0;
+                //foreach (HexTile tile in sortedTiles)
+                //{
+                //    Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
+
+                //    float gradient = (float)n / sortedTiles.Count;
+                //    Color color = new Color(1f - gradient, 0f, 0.5f + gradient / 2);
+                //    n++;
+
+                //    tileMaterial.SetColor("_Color", color);
+                //}
             }
 
             if (GUILayout.Button("Cellular automata pass"))
