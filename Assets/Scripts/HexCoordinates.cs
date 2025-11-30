@@ -70,7 +70,8 @@ public struct HexCoordinates
     public static int HexDistance(HexCoordinates a, HexCoordinates b)
     {
         HexCoordinates vector = HexSubtract(a, b);
-        return (Mathf.Abs(vector.q) + Mathf.Abs(vector.r) + Mathf.Abs(vector.s)) / 2;
+        return Mathf.Max(Mathf.Abs(vector.q), Mathf.Abs(vector.r), Mathf.Abs(vector.s));
+        //return (Mathf.Abs(vector.q) + Mathf.Abs(vector.r) + Mathf.Abs(vector.s)) / 2;
     }
 
     private static HexCoordinates CubeRound(float q, float r, float s)
@@ -114,6 +115,11 @@ public struct HexCoordinates
 
     public (int, int, int) ToTuple()
     {
-        return (this.q, this.r, this.s);
+        return (q, r, s);
+    }
+
+    public Vector3 ToVec3()
+    {
+        return new Vector3(q, r, s);
     }
 }
