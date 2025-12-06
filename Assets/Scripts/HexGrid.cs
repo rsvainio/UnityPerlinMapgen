@@ -77,7 +77,12 @@ public class HexGrid : MonoBehaviour
         }
     }
 
-    public HexTile[] GetTiles()
+    public Dictionary<(int, int, int), HexTile> GetTiles()
+    {
+        return tiles;
+    }
+
+    public HexTile[] GetTilesArray()
     {
         return tiles.Values.ToArray();
     }
@@ -220,7 +225,7 @@ public class HexGrid : MonoBehaviour
 
     private void BuildBorderTileList()
     {
-        foreach (HexTile tile in GetTiles())
+        foreach (HexTile tile in GetTilesArray())
         {
             if (tile.GetNeighbors().Length != 6) // add this tile to the list of map border tiles if it has fewer than 6 neighbors
             {

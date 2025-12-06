@@ -72,8 +72,26 @@ public class HexTile : MonoBehaviour
         return neighbors;
     }
 
+    public HexCoordinates GetCoordinatesInDirection(Vector3 vector)
+    {
+        float bestDotProduct = 0f;
+        HexCoordinates bestDirection = HexMetrics.neighborVectors[0];
+
+        foreach(HexCoordinates coordinate in HexMetrics.neighborVectors)
+        {
+            float dot = Vector3.Dot(coordinate.ToVec3(), vector);
+            if (dot > bestDotProduct)
+            {
+                dot = bestDotProduct;
+                bestDirection = coordinate;
+            }
+        }
+
+        return coordinates.HexAdd(bestDirection);
+    }
+
     // returns a list of each HexTile that is at most a distance of range from this tile
-    public List<HexTile> GetTilesAtRange(int range)
+    public List<HexTile> GetTilesArrayAtRange(int range)
     {
         List<HexTile> results = new List<HexTile>();
         for (int q = -range; q <= range; q++)
