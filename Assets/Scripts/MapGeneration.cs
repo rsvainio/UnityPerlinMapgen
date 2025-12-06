@@ -46,7 +46,7 @@ public class MapGeneration
         temperatureMap = DoTemperatureRefinementPass(grid, temperatureMap, altitudeMap);
 
         //probably will need to be rewritten
-        foreach (HexTile tile in grid.GetTiles())
+        foreach (HexTile tile in grid.GetTilesArray())
         {
             (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
             float precipitation = precipitationMap[coordinates];
@@ -145,7 +145,7 @@ public class MapGeneration
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
 
-        foreach (HexTile tile in grid.GetTiles())
+        foreach (HexTile tile in grid.GetTilesArray())
         {
             HexCoordinates coordinates = tile.GetCoordinates();
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
@@ -188,7 +188,7 @@ public class MapGeneration
         float sin = Mathf.Sin(angle);
         float cos = Mathf.Cos(angle);
 
-        foreach (HexTile tile in grid.GetTiles())
+        foreach (HexTile tile in grid.GetTilesArray())
         {
             HexCoordinates coordinates = tile.GetCoordinates();
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
@@ -340,7 +340,7 @@ public class MapGeneration
     {
         Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
         Debug.Log($"Wind direction: {windDirection.ToString()}");
-        List<HexTile> sortedTiles = grid.GetTiles()
+        List<HexTile> sortedTiles = grid.GetTilesArray()
             .OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
             .ToList();
 
@@ -360,93 +360,80 @@ public class MapGeneration
             }
             else
             {
-                float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
-                float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
-                startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
+                startingPrecipitation = 0.1f;
+                //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
+                //float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
+                //startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
             }
             rainShadowMap[key] = startingPrecipitation;
         }
 
-        // calculate how perpendicular each neighbor hex's vector is relative to the wind direction
-        float[] neighborWindDots = new float[HexMetrics.neighborVectors.Length];
-        float downwindDiffusion = 0.3f;
-        float sidewindDiffusion = 0.1f;
-        for (int i = 0; i < HexMetrics.neighborVectors.Length; i++)
-        {
-            float dotProduct = Vector3.Dot(HexMetrics.neighborVectors[i].ToVec3(), windDirection);
-            neighborWindDots[i] = Mathf.Lerp(sidewindDiffusion, downwindDiffusion, 1f - Mathf.Abs(dotProduct));
-        }
-        
         // simulate rain shadow for each tile
         foreach (HexTile tile in sortedTiles)
         {
             (int, int, int) key = tile.GetCoordinates().ToTuple();
-            float incoming = rainShadowMap[key];
-            float precipitationSum = 0;
-            HexTile[] neighbors = tile.GetNeighbors();
-            for (int i = 0; i < neighbors.Length; i++)
+            float tilePrecipitation = rainShadowMap[key];
+
+            HexCoordinates neighborVector = tile.GetCoordinatesInDirection(windDirection);
+            if (grid.GetTiles().TryGetValue(neighborVector.ToTuple(), out HexTile downwindTile))
             {
-                precipitationSum += rainShadowMap[neighbors[i].GetCoordinates().ToTuple()] * neighborWindDots[i];
-            }
-            incoming += precipitationSum / neighbors.Length - incoming;
-
-            Vector3 neighborVector = windDirection + tile.GetCoordinates().ToVec3();
-            int q = Mathf.RoundToInt(neighborVector.x);
-            int r = Mathf.RoundToInt(neighborVector.y);
-            int s = Mathf.RoundToInt(neighborVector.z);
-            if (grid.tiles.TryGetValue((q, r, s), out HexTile downwind))
-            {
-                float heightDiff = downwind.GetAltitude() - tile.GetAltitude();
-                if (heightDiff > 0)
+                if (downwindTile.terrain != Terrain.Ocean && downwindTile.terrain != Terrain.FreshWater)
                 {
-                    float rain = incoming * (heightDiff * 1.5f);
-                    rainShadowMap[key] += rain;
-                    incoming -= rain;
-                }
-                else
-                {
-                    incoming += heightDiff * 0.2f;
-                }
+                    float heightDifference = tile.GetAltitude() - downwindTile.GetAltitude();
+                    float precipitationPassedDownwind;
+                    if (heightDifference > 0f)
+                    {
+                        // light drying of the air when downwind tile is lower in altitude
+                        precipitationPassedDownwind = tilePrecipitation + heightDifference * 0.2f;
+                    }
+                    else
+                    {
+                        // moisture in the air precipitates when downwind tile is higher in altitude
+                        // note that this will always be negative and therefore reduces the precipitation of the downwind tile
+                        precipitationPassedDownwind = heightDifference * 1.5f;
+                    }
 
-                incoming = Mathf.Clamp01(incoming);
-
-                (int, int, int) downWindKey = downwind.GetCoordinates().ToTuple();
-                rainShadowMap[downWindKey] = Mathf.Max(rainShadowMap[downWindKey], incoming);
+                    //rainShadowMap[key] -= precipitationPassedDownwind;
+                    rainShadowMap[neighborVector.ToTuple()] += Mathf.Max(precipitationPassedDownwind, rainShadowMap[neighborVector.ToTuple()]);
+                }
             }
+            
+            rainShadowMap[key] = Mathf.Clamp01(rainShadowMap[key]);
         }
 
-        //foreach (HexTile tile in sortedTiles)
+        // TODO: finish this diffusion calculation
+        // calculate how perpendicular each neighbor hex's vector is relative to the wind direction
+        //float[] neighborWindDots = new float[HexMetrics.neighborVectors.Length];
+        //float downwindDiffusion = 0.3f;
+        //float sidewindDiffusion = 0.1f;
+        //for (int i = 0; i < HexMetrics.neighborVectors.Length; i++)
         //{
-        //    (int, int, int) key = tile.GetCoordinates().ToTuple();
-        //    float incoming = rainShadowMap[key];
-
-        //    Vector3 neighborVector = windDirection + tile.GetCoordinates().ToVec3();
-        //    int q = Mathf.RoundToInt(neighborVector.x);
-        //    int r = Mathf.RoundToInt(neighborVector.y);
-        //    int s = Mathf.RoundToInt(neighborVector.z);
-        //    if (grid.tiles.TryGetValue((q, r, s), out HexTile downwind))
-        //    {
-        //        float heightDiff = downwind.GetAltitude() - tile.GetAltitude();
-        //        if (heightDiff > 0)
-        //        {
-        //            float rain = incoming * (heightDiff * 1.5f);
-        //            rainShadowMap[key] += rain;
-        //            incoming -= rain;
-        //        }
-        //        else
-        //        {
-        //            incoming += heightDiff * 0.2f;
-        //        }
-
-        //        incoming = Mathf.Clamp01(incoming);
-
-        //        (int, int, int) downWindKey = downwind.GetCoordinates().ToTuple();
-        //        rainShadowMap[downWindKey] = Mathf.Max(rainShadowMap[downWindKey], incoming);
-        //    }
+        //    float dotProduct = Vector3.Dot(HexMetrics.neighborVectors[i].ToVec3(), windDirection);
+        //    neighborWindDots[i] = Mathf.Lerp(sidewindDiffusion, downwindDiffusion, 1f - Mathf.Abs(dotProduct));
         //}
 
-        precipitationMap = rainShadowMap;
-        return rainShadowMap;
+        //// assign diffused precipitation values to each tile
+        //Dictionary<(int, int, int), float> diffusedRainShadowMap = new Dictionary<(int, int, int), float>();
+        //foreach (HexTile tile in sortedTiles)
+        //{
+        //    float precipitationSum = 0f;
+        //    HexTile[] neighbors = tile.GetNeighbors();
+        //    for (int i = 0; i < 6; i++)
+        //    {
+        //        HexTile neighbor = neighbors.ElementAtOrDefault(i);
+        //        if (neighbor != null)
+        //        {
+        //            precipitationSum += rainShadowMap[neighbor.GetCoordinates().ToTuple()] * neighborWindDots[i];
+        //        }
+        //    }
+
+        //    (int, int, int) key = tile.GetCoordinates().ToTuple();
+        //    float diffusedPrecipitation = rainShadowMap[key] + (precipitationSum - rainShadowMap[key]) / neighbors.Length;
+        //    diffusedRainShadowMap[key] = diffusedPrecipitation;
+        //}
+
+        precipitationMap = diffusedRainShadowMap;
+        return diffusedRainShadowMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
@@ -454,7 +441,7 @@ public class MapGeneration
     // the pathfinding for rivers is probably quite naive, should try and implement something else
     public List<List<HexTile>> GenerateRivers(float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
-        List<HexTile> riverSourceCandidates = grid.GetTiles().Where(t => t.GetAltitude() >= minAltitude
+        List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.GetAltitude() >= minAltitude
                                                 && t.GetTemperature() >= minPrecipitation
                                                 && t.GetPrecipitation() >= minTemperature)
                                             .ToList();
@@ -543,7 +530,7 @@ public class MapGeneration
         }
 
         // assign terrain to non-oceanic water tiles
-        foreach (HexTile tile in grid.GetTiles())
+        foreach (HexTile tile in grid.GetTilesArray())
         {
             if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
             {
@@ -558,7 +545,7 @@ public class MapGeneration
     // this should obviously only be run after checking which tiles are oceanic
     private void CalculateOceanDistances()
     {
-        foreach (HexTile tile in grid.GetTiles())
+        foreach (HexTile tile in grid.GetTilesArray())
         {
             int distanceFromNearestOcean = 0;
             if (tile.terrain != Terrain.Ocean)
