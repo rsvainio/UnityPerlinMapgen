@@ -34,7 +34,7 @@ public static class HexMetrics
     };
 
     // currently only used for wind direction
-    public static Vector3 degreesToHexDirection(int angle)
+    public static Vector3 ConvertDegreesToVector(int angle)
     {
         float radians = angle * Mathf.Deg2Rad;
         float vx = Mathf.Cos(radians);

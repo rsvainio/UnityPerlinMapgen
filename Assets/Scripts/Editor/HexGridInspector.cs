@@ -84,7 +84,7 @@ public class HexGridInspector : Editor
                 if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
                 if (generateTemperatureMap) { mapGenerator.GenerateTemperatureMap(scale: this.temperatureScale, exponent: this.temperatureExponent); }
 
-                foreach (HexTile tile in grid.GetTiles())
+                foreach (HexTile tile in grid.GetTilesArray())
                 {
                     //(int, int, int) coordinates = tile.GetCoordinates().ToTuple();
 
@@ -139,7 +139,8 @@ public class HexGridInspector : Editor
                     {
                         colorBlend += tileMaterial.GetColor("_Color") + new Color(0f, 0f, precipitation);
                     }
-                    tileMaterial.SetColor("_Color", colorBlend);
+                    //tileMaterial.SetColor("_Color", colorBlend);
+                    tileMaterial.SetColor("_Color", new Color(0f, altitude, precipitation));
                 }
 
                 if (generateRivers)
@@ -158,7 +159,7 @@ public class HexGridInspector : Editor
                 ////testing rain shadow calculation
                 //Vector3 windDirection = HexMetrics.ConvertDegreesToVector(90);
                 //Debug.Log($"Wind direction: {windDirection.ToString()}");
-                //List<HexTile> sortedTiles = grid.GetTiles()
+                //List<HexTile> sortedTiles = grid.GetTilesArray()
                 //.OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection))
                 //.ToList();
 
@@ -178,13 +179,13 @@ public class HexGridInspector : Editor
             if (GUILayout.Button("Cellular automata pass"))
             {
                 Dictionary<(int, int, int), float> altitudeMap = new();
-                foreach (HexTile tile in grid.GetTiles())
+                foreach (HexTile tile in grid.GetTilesArray())
                 {
                     altitudeMap.Add(tile.GetCoordinates().ToTuple(), tile.GetAltitude());
                 }
                 altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
 
-                foreach (HexTile tile in grid.GetTiles())
+                foreach (HexTile tile in grid.GetTilesArray())
                 {
                     (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
                     float altitude = altitudeMap[coordinates];
@@ -242,7 +243,7 @@ public class HexGridInspector : Editor
             {
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
-                HexTile[] tiles = grid.GetTiles();
+                HexTile[] tiles = grid.GetTilesArray();
                 Color[] mountainRangeColors = {Color.green, Color.red, Color.blue, Color.yellow, Color.purple};
 
                 for(int i = 0; i < mountainRangeCount; i++)
