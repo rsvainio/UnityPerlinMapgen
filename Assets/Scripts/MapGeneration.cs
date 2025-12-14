@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -368,57 +369,38 @@ public class MapGeneration
             cloudCoverMap[key] = startingCloudCover;
         }
 
-        // TODO: finish this diffusion calculation
-        // calculate how perpendicular each neighbor hex's vector is relative to the wind direction
-        //float[] neighborWindDots = new float[HexMetrics.neighborVectors.Length];
-        //float downwindDiffusion = 0.3f;
-        //float sidewindDiffusion = 0.1f;
-        //for (int i = 0; i < HexMetrics.neighborVectors.Length; i++)
-        //{
-        //    float dotProduct = Vector3.Dot(HexMetrics.neighborVectors[i].ToVec3(), windDirection);
-        //    neighborWindDots[i] = Mathf.Lerp(sidewindDiffusion, downwindDiffusion, 1f - Mathf.Abs(dotProduct));
-        //}
-
         // simulate rain shadow for each tile
         Dictionary<(int, int, int), float> rainShadowMap = new Dictionary<(int, int, int), float>();
         foreach (HexTile tile in sortedTiles)
         {
             (int, int, int) key = tile.GetCoordinates().ToTuple();
-            float tileMaxCloudCover = 1f - tile.GetAltitude() * 0.95f;
+            float tileMaxCloudCover = 1f - tile.GetAltitude();
             float tileCloudCover = Mathf.Min(cloudCoverMap[key], tileMaxCloudCover);
             rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
 
             (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
             if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
             {
-                // if (downwindTile.terrain != Terrain.Ocean && downwindTile.terrain != Terrain.FreshWater)
-                if (downwindTile.terrain != Terrain.Ocean)
-                {
-                    cloudCoverMap[neighborKey] += tileCloudCover;
-                }
+                float altitudeFactor = 1f - Mathf.Pow(tile.GetAltitude(), 1.5f);
+                cloudCoverMap[neighborKey] += tileCloudCover * altitudeFactor;
             }
         }
 
-        //foreach (HexTile tile in sortedTiles)
-        //{
-        //    (int, int, int) key = tile.GetCoordinates().ToTuple();
-        //    float tileMaxCloudCover = 1f - tile.GetAltitude() * 0.95f;
-        //    float tileCloudCover = Mathf.Min(cloudCoverMap[key], tileMaxCloudCover);
-        //    rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
+        // simulate diffusion for sideways wind
+        Dictionary<(int, int, int), float> averagedRainShadowMap = new Dictionary<(int, int, int), float>();
+        foreach (HexTile tile in sortedTiles)
+        {
+            (int, int, int) key = tile.GetCoordinates().ToTuple();
+            float precipitationSum = rainShadowMap[key];
+            foreach (HexTile neighbor in tile.GetNeighbors())
+            {
+                precipitationSum += rainShadowMap[neighbor.GetCoordinates().ToTuple()];
+            }
+            averagedRainShadowMap[key] = precipitationSum / (tile.GetNeighbors().Length + 1);
+        }
 
-        //    (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
-        //    if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
-        //    {
-        //        // if (downwindTile.terrain != Terrain.Ocean && downwindTile.terrain != Terrain.FreshWater)
-        //        if (downwindTile.terrain != Terrain.Ocean)
-        //        {
-        //            cloudCoverMap[neighborKey] += tileCloudCover;
-        //        }
-        //    }
-        //}
-
-        precipitationMap = rainShadowMap;
-        return rainShadowMap;
+        precipitationMap = averagedRainShadowMap;
+        return averagedRainShadowMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
