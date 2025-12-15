@@ -406,7 +406,7 @@ public class MapGeneration
     // altitude seems to be the biggest obstacle for river source candidate spots being found
     // might be fixed after elevation feature generation is implemented
     // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.6f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.75f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
     {
         List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.GetAltitude() >= minAltitude
                                                 && t.GetTemperature() >= minPrecipitation
@@ -418,6 +418,7 @@ public class MapGeneration
 
         foreach (HexTile tile in riverSourceCandidates)
         {
+            //add checks here to make sure the tile is still a valid candidate
             float weight = tile.GetPrecipitation() * tile.GetAltitude();
             if (Random.value < weight)
             {
@@ -428,7 +429,7 @@ public class MapGeneration
 
         // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
         // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
-        List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
+        List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null)
         {
             if (tile.GetTerrain() == Terrain.Ocean || tile.GetTerrain() == Terrain.FreshWater)
             {
@@ -442,6 +443,23 @@ public class MapGeneration
             riverTiles ??= new List<HexTile>();
             riverTiles.Add(tile);
 
+            // search for other rivers in a 3-tile radius and bias the river generation towards those tiles
+            // this helps to generate more realistic drainage basins
+            if (biasTile == null)
+            {
+                foreach (HexTile searchTile in tile.GetTilesAtRange(5))
+                {
+                    if (!riverTiles.Contains(searchTile))
+                    {
+                        if (searchTile.HasRiver() || searchTile.GetTerrain() == Terrain.Ocean || searchTile.GetTerrain() == Terrain.FreshWater)
+                        {
+                            biasTile = searchTile;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
                 if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
@@ -454,9 +472,19 @@ public class MapGeneration
                     }
                     else
                     {
-                        float newAltitude = neighbor.GetAltitude();
-                        if (newAltitude < lowestAltitude)
+                        float directionWeight = 0f;
+                        if (biasTile != null)
                         {
+                            HexCoordinates toNeighbor = neighbor.GetCoordinates().HexSubtract(tile.GetCoordinates());
+                            HexCoordinates toDestination = biasTile.GetCoordinates().HexSubtract(tile.GetCoordinates());
+                            directionWeight = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
+                            directionWeight = Mathf.Lerp(0f, 0.25f, directionWeight);
+                        }
+
+                        float newAltitude = neighbor.GetAltitude();
+                        if (newAltitude * (1f - directionWeight) < lowestAltitude)
+                        {
+                            Debug.Log($"Old altitude: {lowestAltitude}, new altitude: {newAltitude}");
                             nextTile = neighbor;
                             lowestAltitude = newAltitude;
                         }
@@ -470,7 +498,7 @@ public class MapGeneration
             }
             else
             {
-                return DoRiverRecursion(nextTile, riverTiles);
+                return DoRiverRecursion(nextTile, biasTile, riverTiles);
             }
         }
 
