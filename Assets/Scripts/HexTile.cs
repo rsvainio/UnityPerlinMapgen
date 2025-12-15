@@ -10,6 +10,7 @@ public class HexTile : MonoBehaviour
     public Terrain terrain;
     private HexTile[] neighbors;
     [SerializeField] private float precipitation, altitude, temperature;
+    private bool hasRiver = false;
 
     public void Initialize(int q, int r, int s, Terrain terrain, HexGrid grid)
     {
@@ -39,6 +40,8 @@ public class HexTile : MonoBehaviour
         this.temperature = temperature;
     }
 
+    public void SetHasRiver( bool hasRiver ) { this.hasRiver = hasRiver; }
+
     public void SetTerrain(Terrain terrain)
     {
         this.terrain = terrain;
@@ -62,7 +65,7 @@ public class HexTile : MonoBehaviour
                 }
                 catch(ArgumentException)
                 {
-                    j += 1;
+                    j++;
                 }
             }
 

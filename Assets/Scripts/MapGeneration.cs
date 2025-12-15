@@ -416,52 +416,46 @@ public class MapGeneration
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
 
-        /*
-        // Debug.Log(riverStartingPointCandidates.Count);
-        int n = rand.Next(riverSourceCandidates.Count);
-        HexTile tile = riverSourceCandidates[n];
-        List<HexTile> newRiver = DoRiverRecursion(tile);
-        rivers.Add(newRiver);
-
-        riverSourceCandidates.Remove(tile);
-        */
-
         foreach (HexTile tile in riverSourceCandidates)
         {
             float weight = tile.GetPrecipitation() * tile.GetAltitude();
-            if (Random.value > weight) { continue; }
-
-            List<HexTile> newRiver = DoRiverRecursion(tile);
-            rivers.Add(newRiver);
+            if (Random.value < weight)
+            {
+                List<HexTile> newRiver = DoRiverRecursion(tile);
+                rivers.Add(newRiver);
+            }
         }
 
         // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
         // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
         static List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
         {
+            tile.SetHasRiver(true);
+            HexTile nextTile = null;
             float lowestAltitude = tile.GetAltitude();
-            HexTile newTile = null;
-            if (riverTiles == null) { riverTiles = new List<HexTile>(); }
+            riverTiles ??= new List<HexTile>();
             riverTiles.Add(tile);
 
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
-                if (riverTiles.Contains(neighbor)) { continue; } // checks if the new tile is already a part of the same river
-                float newAltitude = neighbor.GetAltitude();
-                if (newAltitude * 0.9f < lowestAltitude)
+                if (!riverTiles.Contains(neighbor)) // checks if the new tile is already a part of the same river
                 {
-                    newTile = neighbor;
-                    lowestAltitude = newAltitude;
+                    float newAltitude = neighbor.GetAltitude();
+                    if (newAltitude * 0.9f < lowestAltitude)
+                    {
+                        nextTile = neighbor;
+                        lowestAltitude = newAltitude;
+                    }
                 }
             }
 
-            if (lowestAltitude == tile.GetAltitude())
+            if (nextTile == null)
             {
                 return riverTiles;
             }
             else
             {
-                return DoRiverRecursion(newTile, riverTiles);
+                return DoRiverRecursion(nextTile, riverTiles);
             }
         }
 
