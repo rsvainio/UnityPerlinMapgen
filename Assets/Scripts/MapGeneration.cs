@@ -428,8 +428,14 @@ public class MapGeneration
 
         // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
         // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
-        static List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
+        List<HexTile> DoRiverRecursion(HexTile tile, List<HexTile> riverTiles = null)
         {
+            if (tile.GetTerrain() == Terrain.Ocean || tile.GetTerrain() == Terrain.FreshWater)
+            {
+                // might need to add something for growing a lake when a river terminates in such a tile
+                return riverTiles;
+            }
+
             tile.SetHasRiver(true);
             HexTile nextTile = null;
             float lowestAltitude = tile.GetAltitude();
@@ -438,13 +444,22 @@ public class MapGeneration
 
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
-                if (!riverTiles.Contains(neighbor)) // checks if the new tile is already a part of the same river
+                if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
                 {
-                    float newAltitude = neighbor.GetAltitude();
-                    if (newAltitude * 0.9f < lowestAltitude)
+                    if (neighbor.HasRiver())
                     {
-                        nextTile = neighbor;
-                        lowestAltitude = newAltitude;
+                        // rivers should combine here
+                        nextTile = null;
+                        break;
+                    }
+                    else
+                    {
+                        float newAltitude = neighbor.GetAltitude();
+                        if (newAltitude < lowestAltitude)
+                        {
+                            nextTile = neighbor;
+                            lowestAltitude = newAltitude;
+                        }
                     }
                 }
             }
