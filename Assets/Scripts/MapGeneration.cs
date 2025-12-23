@@ -426,6 +426,10 @@ public class MapGeneration
                 if (newRiver.Count > 2) // only include rivers that are big enough
                 {
                     rivers.Add(newRiver);
+                    foreach (HexTile riverTile in newRiver)
+                    {
+                        riverTile.SetHasRiver(true);
+                    }
                 }
                 else
                 {
@@ -442,13 +446,6 @@ public class MapGeneration
         // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
         List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
         {
-            if (tile.GetTerrain() == Terrain.Ocean || tile.GetTerrain() == Terrain.FreshWater)
-            {
-                // might need to add something for growing a lake when a river terminates in such a tile
-                return riverTiles;
-            }
-
-            tile.SetHasRiver(true);
             HexTile nextTile = null;
             float lowestAltitude = tile.GetAltitude();
             riverTiles ??= new List<HexTile>();
@@ -479,15 +476,34 @@ public class MapGeneration
             float lowestEffectiveAltitude = 1f;
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
-                if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
+                if (neighbor.GetTerrain() == Terrain.Ocean || neighbor.GetTerrain() == Terrain.FreshWater) // the neighbouring tile is a water tile so the river terminates
                 {
-                    if (neighbor.HasRiver())
+                    // might need to add something for growing a lake when a river terminates in such a tile
+                    return riverTiles;
+                }
+                else if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
+                {
+                    if (neighbor.HasRiver()) // two rivers have met and should combine here
                     {
-                        // rivers should combine here
                         return riverTiles;
                     }
                     else
                     {
+                        // check that the tile 'neighbor' has no surrounding tiles that are part of this river other than 'tile'
+                        bool neighborIsValid = true;
+                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
+                        {
+                            if (!neighborIsValid)
+                            {
+                                break;
+                            }
+                            if (riverTiles.Contains(neighborsNeighbor))
+                            {
+                                neighborIsValid = neighborsNeighbor == tile;
+                            }
+                        }
+                        if (!neighborIsValid) { continue; }
+
                         float alignment = 0f;
                         if (biasTile != null)
                         {
