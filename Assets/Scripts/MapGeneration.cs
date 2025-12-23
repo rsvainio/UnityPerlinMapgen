@@ -406,7 +406,7 @@ public class MapGeneration
     // altitude seems to be the biggest obstacle for river source candidate spots being found
     // might be fixed after elevation feature generation is implemented
     // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.75f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.65f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
     {
         List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.GetAltitude() >= minAltitude
                                                 && t.GetTemperature() >= minPrecipitation
@@ -423,13 +423,24 @@ public class MapGeneration
             if (Random.value < weight)
             {
                 List<HexTile> newRiver = DoRiverRecursion(tile);
-                rivers.Add(newRiver);
+                if (newRiver.Count > 2) // only include rivers that are big enough
+                {
+                    rivers.Add(newRiver);
+                }
+                else
+                {
+                    foreach (HexTile riverTile in newRiver)
+                    {
+                        riverTile.SetHasRiver(false);
+                    }
+                    newRiver.Clear();
+                }
             }
         }
 
         // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
         // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
-        List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null)
+        List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
         {
             if (tile.GetTerrain() == Terrain.Ocean || tile.GetTerrain() == Terrain.FreshWater)
             {
@@ -443,23 +454,29 @@ public class MapGeneration
             riverTiles ??= new List<HexTile>();
             riverTiles.Add(tile);
 
-            // search for other rivers in a 3-tile radius and bias the river generation towards those tiles
-            // this helps to generate more realistic drainage basins
+            // search for other rivers in a biasRange radius and bias the river generation towards those tiles
+            // this helps to generate more natural-looking drainage basins
             if (biasTile == null)
             {
-                foreach (HexTile searchTile in tile.GetTilesAtRange(5))
+                int oldDistance = 0;
+                foreach (HexTile searchTile in tile.GetTilesAtRange(biasRange))
                 {
                     if (!riverTiles.Contains(searchTile))
                     {
                         if (searchTile.HasRiver() || searchTile.GetTerrain() == Terrain.Ocean || searchTile.GetTerrain() == Terrain.FreshWater)
                         {
-                            biasTile = searchTile;
-                            break;
+                            int newDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), searchTile.GetCoordinates());
+                            if (newDistance < oldDistance || oldDistance == 0)
+                            {
+                                oldDistance = newDistance;
+                                biasTile = searchTile;
+                            }
                         }
                     }
                 }
             }
-            
+
+            float lowestEffectiveAltitude = 1f;
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
                 if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
@@ -467,27 +484,27 @@ public class MapGeneration
                     if (neighbor.HasRiver())
                     {
                         // rivers should combine here
-                        nextTile = null;
-                        break;
+                        return riverTiles;
                     }
                     else
                     {
-                        float directionWeight = 0f;
+                        float alignment = 0f;
                         if (biasTile != null)
                         {
                             HexCoordinates toNeighbor = neighbor.GetCoordinates().HexSubtract(tile.GetCoordinates());
                             HexCoordinates toDestination = biasTile.GetCoordinates().HexSubtract(tile.GetCoordinates());
-                            directionWeight = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
-                            directionWeight = Mathf.Lerp(0f, 0.25f, directionWeight);
+                            alignment = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
+                            alignment = Mathf.Clamp01((alignment + 1f) * 0.5f);
+                        }
+                        
+                        float effectiveAltitude = neighbor.GetAltitude() - alignment * 0.15f;
+                        effectiveAltitude += Random.Range(-0.02f, 0.02f);
+                        if (effectiveAltitude < lowestEffectiveAltitude)
+                        {
+                            nextTile = neighbor;
+                            lowestEffectiveAltitude = effectiveAltitude;
                         }
 
-                        float newAltitude = neighbor.GetAltitude();
-                        if (newAltitude * (1f - directionWeight) < lowestAltitude)
-                        {
-                            Debug.Log($"Old altitude: {lowestAltitude}, new altitude: {newAltitude}");
-                            nextTile = neighbor;
-                            lowestAltitude = newAltitude;
-                        }
                     }
                 }
             }
