@@ -10,6 +10,7 @@ public struct HexCoordinates
         this.q = q;
         this.r = r;
         this.s = s;
+        Debug.Assert(q + r + s == 0, $"Tried to create a HexCoordinates object with coordinates {q},{r},{s}");
     }
 
     public HexCoordinates(int q, int r)
@@ -17,6 +18,7 @@ public struct HexCoordinates
         this.q = q;
         this.r = r;
         s = -q - r;
+        Debug.Assert(q + r + s == 0, $"Tried to create a HexCoordinates object with coordinates {q},{r},{s}");
     }
 
     public HexCoordinates((int, int, int) coordinates)
@@ -65,6 +67,11 @@ public struct HexCoordinates
         int r = a.r - b.r;
         int s = a.s - b.s;
         return new HexCoordinates(q, r, s);
+    }
+
+    public static int HexDistance(HexTile a, HexTile b)
+    {
+        return HexDistance(a.GetCoordinates(), b.GetCoordinates());
     }
 
     public static int HexDistance(HexCoordinates a, HexCoordinates b)

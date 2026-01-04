@@ -93,7 +93,7 @@ public class HexTile : MonoBehaviour
     }
 
     // returns a list of each HexTile that is at most a distance of range from this tile
-    public List<HexTile> GetTilesArrayAtRange(int range)
+    public List<HexTile> GetTilesAtRange(int range)
     {
         List<HexTile> results = new List<HexTile>();
         for (int q = -range; q <= range; q++)

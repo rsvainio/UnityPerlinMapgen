@@ -478,7 +478,6 @@ public class MapGeneration
             {
                 if (neighbor.GetTerrain() == Terrain.Ocean || neighbor.GetTerrain() == Terrain.FreshWater) // the neighbouring tile is a water tile so the river terminates
                 {
-                    // might need to add something for growing a lake when a river terminates in such a tile
                     return riverTiles;
                 }
                 else if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
@@ -527,12 +526,82 @@ public class MapGeneration
 
             if (nextTile == null)
             {
-                return riverTiles;
+                if (Random.value <= 0.15f) // random chance to build a lake at the end of the river instead of terminating
+                {
+                    return BuildLake(riverTiles);
+                }
+                else
+                {
+                    return riverTiles;
+                }
             }
             else
             {
                 return DoRiverRecursion(nextTile, biasTile, riverTiles);
             }
+        }
+
+        List<HexTile> BuildLake(List<HexTile> river)
+        {
+            if (river.Count < 3)
+            {
+                Debug.Log("River size too small to build lakes, returning...");
+                return river;
+            }
+
+            // could also try just taking the final tile of the river and generating a lake from that
+            HexTile lakeStartCandidate = null;
+            float lowestAltitude = 1f; // this needs to be initialized to some other value, otherwise it's possible for lakes to go up mountains etc.
+            int tilesToIterate = Mathf.RoundToInt((float)river.Count * 0.2f);
+            for (int i = river.Count; i > river.Count - tilesToIterate; --i)
+            {
+                HexTile curRiverTile = river[i];
+                foreach (HexTile neighbor in curRiverTile.GetNeighbors())
+                {
+                    float neighborAltitude = neighbor.GetAltitude();
+                    if (neighborAltitude < lowestAltitude && !river.Contains(neighbor))
+                    {
+                        lowestAltitude = neighborAltitude;
+                        lakeStartCandidate = neighbor;
+                    }
+                }
+            }
+            if (lakeStartCandidate = null)
+            {
+                Debug.Log("No suitable lake start tile found, returning...");
+                return river;
+            }
+
+            List<HexTile> lake = new List<HexTile>();
+            List<HexTile> lakeNeighbors = new List<HexTile>();
+            lake.Add(lakeStartCandidate);
+            lakeStartCandidate.SetTerrain(Terrain.FreshWater);
+            foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
+            while (Random.value <= 1f - ((lake.Count - 1) * 0.1f)) // after the first tile every subsequent tile imposes an additional 10 % chance of stopping lake generation
+            {
+                HexTile nextLakeTile = null;
+                lowestAltitude = 1f;
+                foreach (HexTile neighbor in lakeNeighbors)
+                {
+                    float neighborAltitude = neighbor.GetAltitude();
+                    if (neighborAltitude < lowestAltitude)
+                    {
+                        lowestAltitude = neighborAltitude;
+                        nextLakeTile = neighbor;
+                    }
+                }
+                if (nextLakeTile = null) { break; }
+                // add checks here for if this lake combines into another lake or ocean
+
+                lake.Add(nextLakeTile);
+                lakeNeighbors.Remove(nextLakeTile);
+                foreach (HexTile neighbor in nextLakeTile.GetNeighbors())
+                {
+                    lakeNeighbors.Add(neighbor);
+                }
+            }
+
+            return river;
         }
 
         Debug.Log($"Generated {rivers.Count} rivers from source candidates");
