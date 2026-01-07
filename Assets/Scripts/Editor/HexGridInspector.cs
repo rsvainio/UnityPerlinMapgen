@@ -84,6 +84,8 @@ public class HexGridInspector : Editor
                 if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
                 if (generateTemperatureMap) { mapGenerator.GenerateTemperatureMap(scale: this.temperatureScale, exponent: this.temperatureExponent); }
 
+                if (generateRivers) { grid.rivers = mapGenerator.GenerateRivers(); }
+
                 foreach (HexTile tile in grid.GetTilesArray())
                 {
                     //(int, int, int) coordinates = tile.GetCoordinates().ToTuple();
@@ -99,11 +101,13 @@ public class HexGridInspector : Editor
 
                     // tile color assignment
                     Color colorBlend = new Color(0f, 0f, 0f);
+                    Color altitudeColor = new Color(0f, 0f, 0f);
+                    Color temperatureColor = new Color(0f, 0f, 0f);
+                    Color precipitationColor = new Color(0f, 0f, 0f);
                     if (generateAltitudeMap)
                     {
-                        Color altitudeColor;
-
-                        if (altitude <= grid.waterLevel)
+                        Terrain terrain = tile.GetTerrain();
+                        if (altitude <= grid.waterLevel || terrain == Terrain.FreshWater || terrain == Terrain.Ocean)
                         {
                             altitudeColor = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
                         }
@@ -129,23 +133,29 @@ public class HexGridInspector : Editor
 
                         colorBlend += altitudeColor;
                     }
-
                     if (generateTemperatureMap)
                     {
-                        colorBlend += tileMaterial.GetColor("_Color") + new Color(temperature, 0f, 0f);
+                        temperatureColor = new Color(temperature * 0.5f, 0f, 0f);
+                        colorBlend += temperatureColor;
                     }
-
                     if (generatePrecipitationMap)
                     {
-                        colorBlend += tileMaterial.GetColor("_Color") + new Color(0f, 0f, precipitation);
+                        precipitationColor = new Color(0f, 0f, precipitation * 0.5f);
+                        colorBlend += precipitationColor;
                     }
-                    //tileMaterial.SetColor("_Color", colorBlend);
-                    tileMaterial.SetColor("_Color", new Color(0f, altitude, precipitation));
+                    tileMaterial.SetColor("_Color", colorBlend);
+                    //if (altitude <= grid.waterLevel)
+                    //{
+                    //    tileMaterial.SetColor("_Color", altitudeColor);
+                    //}
+                    //else
+                    //{
+                    //    tileMaterial.SetColor("_Color", new Color(1f - precipitation, 0.5f * altitude, precipitation));
+                    //}
                 }
 
                 if (generateRivers)
                 {
-                    grid.rivers = mapGenerator.GenerateRivers();
                     foreach (List<HexTile> river in grid.rivers)
                     {
                         for (int i = 0; i < river.Count; i++)
