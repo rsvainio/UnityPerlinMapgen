@@ -447,7 +447,6 @@ public class MapGeneration
         List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
         {
             HexTile nextTile = null;
-            float lowestAltitude = tile.GetAltitude();
             riverTiles ??= new List<HexTile>();
             riverTiles.Add(tile);
 
@@ -473,7 +472,8 @@ public class MapGeneration
                 }
             }
 
-            float lowestEffectiveAltitude = 1f;
+            //float lowestEffectiveAltitude = 1f;
+            float lowestEffectiveAltitude = tile.GetAltitude();
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
                 if (neighbor.GetTerrain() == Terrain.Ocean || neighbor.GetTerrain() == Terrain.FreshWater) // the neighbouring tile is a water tile so the river terminates
@@ -526,7 +526,7 @@ public class MapGeneration
 
             if (nextTile == null)
             {
-                if (Random.value <= 0.15f) // random chance to build a lake at the end of the river instead of terminating
+                if (Random.value <= 0.5f) // random chance to build a lake at the end of the river instead of terminating
                 {
                     return BuildLake(riverTiles);
                 }
@@ -541,11 +541,15 @@ public class MapGeneration
             }
         }
 
+        // TODO: handle the edge case where lakes can intersect a river and split it in two
+        //       this isn't necessarily a bug but the split-off part of the river needs to be assigned into a new river list
+        // TODO: the lakes that are being generated are too small currently, seems to average around 3 tiles
         List<HexTile> BuildLake(List<HexTile> river)
         {
+            Debug.Log("Attempting to create a lake from a river...", river[0]);
             if (river.Count < 3)
             {
-                Debug.Log("River size too small to build lakes, returning...");
+                Debug.Log("River size too small to build lakes, returning...", river[0]);
                 return river;
             }
 
@@ -553,7 +557,7 @@ public class MapGeneration
             HexTile lakeStartCandidate = null;
             float lowestAltitude = 1f; // this needs to be initialized to some other value, otherwise it's possible for lakes to go up mountains etc.
             int tilesToIterate = Mathf.RoundToInt((float)river.Count * 0.2f);
-            for (int i = river.Count; i > river.Count - tilesToIterate; --i)
+            for (int i = river.Count - 1; i > river.Count - tilesToIterate; i--)
             {
                 HexTile curRiverTile = river[i];
                 foreach (HexTile neighbor in curRiverTile.GetNeighbors())
@@ -566,9 +570,9 @@ public class MapGeneration
                     }
                 }
             }
-            if (lakeStartCandidate = null)
+            if (lakeStartCandidate == null)
             {
-                Debug.Log("No suitable lake start tile found, returning...");
+                Debug.Log("No suitable lake start tile found, returning...", river[0]);
                 return river;
             }
 
@@ -577,7 +581,7 @@ public class MapGeneration
             lake.Add(lakeStartCandidate);
             lakeStartCandidate.SetTerrain(Terrain.FreshWater);
             foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
-            while (Random.value <= 1f - ((lake.Count - 1) * 0.1f)) // after the first tile every subsequent tile imposes an additional 10 % chance of stopping lake generation
+            while (Random.value <= 1f - ((lake.Count - 1) * 0.025f)) // after the first tile every subsequent tile imposes an additional chance of stopping lake generation
             {
                 HexTile nextLakeTile = null;
                 lowestAltitude = 1f;
@@ -586,12 +590,22 @@ public class MapGeneration
                     float neighborAltitude = neighbor.GetAltitude();
                     if (neighborAltitude < lowestAltitude)
                     {
+                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
+                        {
+                            Terrain terrain = neighborsNeighbor.GetTerrain();
+                            if (terrain == Terrain.Ocean) // should do something here if the lake combines into an ocean
+                            {
+                                continue;
+                            } else if ( terrain == Terrain.FreshWater) // TODO: combine the lakes here if another lake is encountered
+                            {
+
+                            }
+                        }
                         lowestAltitude = neighborAltitude;
                         nextLakeTile = neighbor;
                     }
                 }
-                if (nextLakeTile = null) { break; }
-                // add checks here for if this lake combines into another lake or ocean
+                if (nextLakeTile == null) { break; }
 
                 lake.Add(nextLakeTile);
                 lakeNeighbors.Remove(nextLakeTile);
@@ -599,6 +613,23 @@ public class MapGeneration
                 {
                     lakeNeighbors.Add(neighbor);
                 }
+            }
+
+            // assign the correct terrain to the lake tiles and adjust them to be below the water level, and return the modified river
+            // alternatively the water level could be ignored, as lakes shouldn't need to be below it
+            foreach (HexTile lakeTile in lake)
+            {
+                lakeTile.SetTerrain(Terrain.FreshWater);
+                river.Remove(lakeTile);
+
+                HexTile[] neighbors = lakeTile.GetNeighbors();
+                float altitude = lakeTile.GetAltitude();
+                foreach (HexTile neighbor in neighbors)
+                {
+                    altitude += neighbor.GetAltitude();
+                }
+                altitude /= neighbors.Length + 1;
+                lakeTile.SetAltitude(Mathf.Min(altitude, grid.waterLevel * Random.Range(0.85f, 0.95f)));
             }
 
             return river;
