@@ -596,6 +596,15 @@ public class MapGeneration
                         lake.Add(neighbor);
                         newLakeTerrain = Terrain.Ocean;
                         nextLakeTile = null;
+
+                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != Terrain.Ocean))
+                        {
+                            if (!lake.Contains(tile))
+                            {
+                                lake.Add(tile);
+                            }
+                        }
+
                         break;
                     }
                     else if (terrain == Terrain.FreshWater)
