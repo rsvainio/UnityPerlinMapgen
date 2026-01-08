@@ -578,6 +578,7 @@ public class MapGeneration
 
             List<HexTile> lake = new List<HexTile>();
             List<HexTile> lakeNeighbors = new List<HexTile>();
+            Terrain newLakeTerrain = Terrain.FreshWater;
             lake.Add(lakeStartCandidate);
             lakeStartCandidate.SetTerrain(Terrain.FreshWater);
             foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
@@ -587,20 +588,25 @@ public class MapGeneration
                 lowestAltitude = 1f;
                 foreach (HexTile neighbor in lakeNeighbors)
                 {
+                    Terrain terrain = neighbor.GetTerrain();
+                    // encountering either another lake or an ocean will result in the current lake being terminated,
+                    // but it'll likely create a noticeable artefact where the two bodies of water connect with only 1 tile
+                    if (terrain == Terrain.Ocean)
+                    {
+                        lake.Add(neighbor);
+                        newLakeTerrain = Terrain.Ocean;
+                        nextLakeTile = null;
+                        break;
+                    }
+                    else if (terrain == Terrain.FreshWater)
+                    {
+                        lake.Add(neighbor);
+                        nextLakeTile = null;
+                        break;
+                    }
                     float neighborAltitude = neighbor.GetAltitude();
                     if (neighborAltitude < lowestAltitude)
                     {
-                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
-                        {
-                            Terrain terrain = neighborsNeighbor.GetTerrain();
-                            if (terrain == Terrain.Ocean) // should do something here if the lake combines into an ocean
-                            {
-                                continue;
-                            } else if ( terrain == Terrain.FreshWater) // TODO: combine the lakes here if another lake is encountered
-                            {
-
-                            }
-                        }
                         lowestAltitude = neighborAltitude;
                         nextLakeTile = neighbor;
                     }
@@ -615,11 +621,11 @@ public class MapGeneration
                 }
             }
 
-            // assign the correct terrain to the lake tiles and adjust them to be below the water level, and return the modified river
+            // assign the appropriate terrain to the lake tiles and adjust them to be below the water level, and return the modified river
             // alternatively the water level could be ignored, as lakes shouldn't need to be below it
             foreach (HexTile lakeTile in lake)
             {
-                lakeTile.SetTerrain(Terrain.FreshWater);
+                lakeTile.SetTerrain(newLakeTerrain);
                 river.Remove(lakeTile);
 
                 HexTile[] neighbors = lakeTile.GetNeighbors();
