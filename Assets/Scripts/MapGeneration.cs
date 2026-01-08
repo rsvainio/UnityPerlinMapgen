@@ -586,35 +586,33 @@ public class MapGeneration
             {
                 HexTile nextLakeTile = null;
                 lowestAltitude = 1f;
-                foreach (HexTile neighbor in lakeNeighbors)
+                for (int i = lakeNeighbors.Count - 1; i < 0; i--)
                 {
+                    HexTile neighbor = lakeNeighbors[i];
                     Terrain terrain = neighbor.GetTerrain();
+                    float neighborAltitude = neighbor.GetAltitude();
                     // encountering either another lake or an ocean will result in the current lake being terminated,
                     // but it'll likely create a noticeable artefact where the two bodies of water connect with only 1 tile
-                    if (terrain == Terrain.Ocean)
+                    if (terrain == Terrain.Ocean || terrain == Terrain.FreshWater)
                     {
                         lake.Add(neighbor);
-                        newLakeTerrain = Terrain.Ocean;
+                        newLakeTerrain = terrain;
                         nextLakeTile = null;
 
-                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != Terrain.Ocean))
+                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != Terrain.Ocean || x.terrain != Terrain.FreshWater))
                         {
                             if (!lake.Contains(tile))
                             {
                                 lake.Add(tile);
                             }
                         }
-
-                        break;
                     }
                     else if (terrain == Terrain.FreshWater)
                     {
                         lake.Add(neighbor);
                         nextLakeTile = null;
-                        break;
                     }
-                    float neighborAltitude = neighbor.GetAltitude();
-                    if (neighborAltitude < lowestAltitude)
+                    else if (neighborAltitude < lowestAltitude)
                     {
                         lowestAltitude = neighborAltitude;
                         nextLakeTile = neighbor;
@@ -624,6 +622,8 @@ public class MapGeneration
 
                 lake.Add(nextLakeTile);
                 lakeNeighbors.Remove(nextLakeTile);
+                // TODO: this is probably causing generated lakes to be small, as it can
+                // continuously add tiles that are already in the lake to the list of neighbours
                 foreach (HexTile neighbor in nextLakeTile.GetNeighbors())
                 {
                     lakeNeighbors.Add(neighbor);
