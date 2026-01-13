@@ -543,7 +543,9 @@ public class MapGeneration
 
         // TODO: handle the edge case where lakes can intersect a river and split it in two
         //       this isn't necessarily a bug but the split-off part of the river needs to be assigned into a new river list
-        // TODO: the lakes that are being generated are too small currently, seems to average around 3 tiles
+        // TODO: add some sort of biasing to make lakes form in a more circular manner, as currently they tend to snake a lot
+        //       this could be done by lowering a candidate tile's effective altitude based on how many of its neighboring tiles
+        //       are already a part of the same lake, (effectiveAltitude = tileAltitude * (1f - neighborTilesInLake * 0.1f))
         List<HexTile> BuildLake(List<HexTile> river)
         {
             Debug.Log("Attempting to create a lake from a river...", river[0]);
@@ -580,13 +582,13 @@ public class MapGeneration
             List<HexTile> lakeNeighbors = new List<HexTile>();
             Terrain newLakeTerrain = Terrain.FreshWater;
             lake.Add(lakeStartCandidate);
-            lakeStartCandidate.SetTerrain(Terrain.FreshWater);
             foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
+
             while (Random.value <= 1f - ((lake.Count - 1) * 0.025f)) // after the first tile every subsequent tile imposes an additional chance of stopping lake generation
             {
                 HexTile nextLakeTile = null;
                 lowestAltitude = 1f;
-                for (int i = lakeNeighbors.Count - 1; i < 0; i--)
+                for (int i = lakeNeighbors.Count - 1; i >= 0; i--)
                 {
                     HexTile neighbor = lakeNeighbors[i];
                     Terrain terrain = neighbor.GetTerrain();
@@ -607,11 +609,6 @@ public class MapGeneration
                             }
                         }
                     }
-                    else if (terrain == Terrain.FreshWater)
-                    {
-                        lake.Add(neighbor);
-                        nextLakeTile = null;
-                    }
                     else if (neighborAltitude < lowestAltitude)
                     {
                         lowestAltitude = neighborAltitude;
@@ -622,11 +619,12 @@ public class MapGeneration
 
                 lake.Add(nextLakeTile);
                 lakeNeighbors.Remove(nextLakeTile);
-                // TODO: this is probably causing generated lakes to be small, as it can
-                // continuously add tiles that are already in the lake to the list of neighbours
                 foreach (HexTile neighbor in nextLakeTile.GetNeighbors())
                 {
-                    lakeNeighbors.Add(neighbor);
+                    if (!lake.Contains(neighbor) && !lakeNeighbors.Contains(neighbor))
+                    {
+                        lakeNeighbors.Add(neighbor);
+                    }
                 }
             }
 
@@ -647,6 +645,7 @@ public class MapGeneration
                 lakeTile.SetAltitude(Mathf.Min(altitude, grid.waterLevel * Random.Range(0.85f, 0.95f)));
             }
 
+            Debug.Log($"Created a lake of size {lake.Count}", lake[0]);
             return river;
         }
 
