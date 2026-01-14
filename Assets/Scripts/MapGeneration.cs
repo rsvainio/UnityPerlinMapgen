@@ -609,10 +609,24 @@ public class MapGeneration
                             }
                         }
                     }
-                    else if (neighborAltitude < lowestAltitude)
+                    else
                     {
-                        lowestAltitude = neighborAltitude;
-                        nextLakeTile = neighbor;
+                        // add a bias to this tile based on its number of neighbouring tiles that are already part of the lake
+                        int neighboringLakeTiles = 0;
+                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
+                        {
+                            if (lake.Contains(neighborsNeighbor))
+                            {
+                                neighboringLakeTiles++;
+                            }
+                        }
+                        neighborAltitude *= 1f - neighboringLakeTiles * 0.1f; // check that this value doesn't need to be adjusted
+
+                        if (neighborAltitude < lowestAltitude)
+                        {
+                            lowestAltitude = neighborAltitude;
+                            nextLakeTile = neighbor;
+                        }
                     }
                 }
                 if (nextLakeTile == null) { break; }
