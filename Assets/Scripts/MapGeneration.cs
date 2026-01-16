@@ -28,7 +28,6 @@ public class MapGeneration
     readonly HexGrid grid;
     public Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
     private Dictionary<(int, int, int), int> oceanDistanceMap = new();
-    private HexCoordinates windDirection;
 
     public MapGeneration(HexGrid grid)
     {
@@ -73,6 +72,72 @@ public class MapGeneration
         }
 
         return precipitationMap;
+
+        Dictionary<(int, int, int), float> SimulateRainShadow()
+        {
+            Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
+            Debug.Log($"Wind direction: {windDirection.ToString()}");
+            List<HexTile> sortedTiles = grid.GetTilesArray()
+                .OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
+                .ToList();
+
+            // set initial cloud cover values for each tile before simulating the effect of rain shadow
+            Dictionary<(int, int, int), float> cloudCoverMap = new Dictionary<(int, int, int), float>();
+            foreach (HexTile tile in sortedTiles)
+            {
+                (int, int, int) key = tile.GetCoordinates().ToTuple();
+                float startingCloudCover = 0;
+                if (tile.terrain == Terrain.Ocean)
+                {
+                    startingCloudCover = 1f;
+                }
+                else if (tile.terrain == Terrain.FreshWater)
+                {
+                    startingCloudCover = 0.5f; // this value will need to be tweaked
+                }
+                else
+                {
+                    startingCloudCover = 0.1f;
+                    //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
+                    //float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
+                    //startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
+                }
+                cloudCoverMap[key] = startingCloudCover;
+            }
+
+            // simulate rain shadow for each tile
+            Dictionary<(int, int, int), float> rainShadowMap = new Dictionary<(int, int, int), float>();
+            foreach (HexTile tile in sortedTiles)
+            {
+                (int, int, int) key = tile.GetCoordinates().ToTuple();
+                float tileMaxCloudCover = 1f - tile.GetAltitude();
+                float tileCloudCover = Mathf.Min(cloudCoverMap[key], tileMaxCloudCover);
+                rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
+
+                (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
+                if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
+                {
+                    float altitudeFactor = 1f - Mathf.Pow(tile.GetAltitude(), 1.5f);
+                    cloudCoverMap[neighborKey] += tileCloudCover * altitudeFactor;
+                }
+            }
+
+            // simulate diffusion for sideways wind
+            Dictionary<(int, int, int), float> averagedRainShadowMap = new Dictionary<(int, int, int), float>();
+            foreach (HexTile tile in sortedTiles)
+            {
+                (int, int, int) key = tile.GetCoordinates().ToTuple();
+                float precipitationSum = rainShadowMap[key];
+                foreach (HexTile neighbor in tile.GetNeighbors())
+                {
+                    precipitationSum += rainShadowMap[neighbor.GetCoordinates().ToTuple()];
+                }
+                averagedRainShadowMap[key] = precipitationSum / (tile.GetNeighbors().Length + 1);
+            }
+
+            precipitationMap = averagedRainShadowMap;
+            return averagedRainShadowMap;
+        }
     }
 
     // https://www.reddit.com/r/proceduralgeneration/comments/4knask/how_can_i_make_this_terrain_more_interesting_ie/d3gfg4d/
@@ -108,6 +173,62 @@ public class MapGeneration
 
         CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
         return altitudeMap;
+
+        Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
+        {
+            // mountain range generation
+            Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
+            Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(scale: 4f, exponent: 2f);
+            for (int i = 0; i < mountainRangeCount - 1; i++)
+            {
+                Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
+                foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
+                {
+                    (int, int, int) key = entry.Key;
+                    float tileElevationMask = Mathf.Lerp(mountainMask[key], 1f - Mathf.Abs(entry.Value * 2 - 1.0f), mixValueMask[key]);
+                    mountainMask[key] = Mathf.Clamp01(tileElevationMask);
+                }
+            }
+
+            foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+            {
+                (int, int, int) key = entry.Key;
+                float tileMountainMask = Mathf.Pow(mountainMask[key], 1.5f);
+
+                float mixValue = Mathf.InverseLerp(grid.waterLevel, grid.waterLevel * 2f, altitudeMap[key]);
+                mixValue *= tileMountainMask;
+                tileMountainMask = Mathf.Lerp(altitudeMap[key], tileMountainMask + altitudeMap[key], mixValue);
+                mountainMask[key] = Mathf.Clamp01(tileMountainMask);
+            }
+
+            altitudeMap = mountainMask;
+            return altitudeMap;
+        }
+
+        Dictionary<(int, int, int), float> GenerateWaterBoundary()
+        {
+            Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(scale: 8f);
+            foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+            {
+                int qCoord = entry.Key.Item1;
+                int rCoord = entry.Key.Item2;
+                int sCoord = entry.Key.Item3;
+                float xDistance = Mathf.Abs(qCoord - (rCoord + sCoord)) / 2f;
+                xDistance = 2 * xDistance / grid.width;
+                float yDistance = Mathf.Abs(rCoord - sCoord) / 2f;
+                yDistance = 2 * yDistance / grid.height;
+
+                float shaping = Mathf.Pow(Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2)), 4f); // https://www.wolframalpha.com/input?i=plot+%28sin%28x*pi%29sin%28y*pi%29%29%5E4+from+0+to+1
+                float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 1.75f);
+                mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
+                mixValue *= Mathf.Lerp(0.75f, 1.25f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
+                shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
+                newAltitudeMap[entry.Key] = shaping;
+            }
+
+            altitudeMap = newAltitudeMap;
+            return newAltitudeMap;
+        }
     }
 
     public Dictionary<(int, int, int), float> GenerateTemperatureMap(float scale = 6f, float exponent = 1.5f, int amplitudeCount = 4, bool temperatureRefinementPass = true)
@@ -132,6 +253,60 @@ public class MapGeneration
         }
 
         return temperatureMap;
+
+        // varies tile temperatures based on pole and ocean proximity and altitude
+        Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
+        {
+            float poleTemp = 0.65f;
+            float equatorTemp = 1.35f;
+            if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.65f; }
+            Dictionary<(int, int, int), float> newTemperatureMap = new();
+            float averageTemperature = 0;
+
+            // calculate each tile's distance from the equator and modulate the temperature based on that
+            // in addition calculate the average temperature of the entire map before altitudinal temperature modulation
+            // so that it can be used to drift the temperature values of tiles closer to the ocean towards the average
+            foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
+            {
+                (int, int, int) key = entry.Key;
+                float altitude = entry.Value;
+                float temperature = temperatureMap[key];
+                int rCoord = key.Item2;
+                int sCoord = key.Item3;
+
+                float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
+                distanceFromEquator = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
+                float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, distanceFromEquator);
+
+                //newTemperature = Mathf.Pow(newTemperature, 0.75f + altitude);
+                //newTemperature *= Mathf.Lerp(1.5f, 0.5f, altitude);
+
+                averageTemperature += newTemperature;
+                newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
+            }
+            averageTemperature /= newTemperatureMap.Count;
+            Debug.Log($"Average temperature of the map: {averageTemperature}");
+
+            // modulate the temperature of tiles based on ocean proximity and altitude
+            foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
+            {
+                (int, int, int) key = entry.Key;
+                HexTile tile = grid.FetchTile(key);
+                if (tile.terrain != Terrain.Ocean)
+                {
+                    float originalTemperature = newTemperatureMap[key];
+                    float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
+                    float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
+
+                    float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+                    newTemperature = Mathf.Lerp(newTemperature / 1.5f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 2f));
+                    newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
+                }
+            }
+
+            temperatureMap = newTemperatureMap;
+            return newTemperatureMap;
+        }
     }
 
     //map generation presets could potentially be expressed as these parameter values
@@ -218,60 +393,6 @@ public class MapGeneration
         return noiseMap;
     }
 
-    // varies tile temperatures based on pole and ocean proximity and altitude
-    private Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
-    {
-        float poleTemp = 0.65f;
-        float equatorTemp = 1.35f;
-        if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.65f; }
-        Dictionary<(int, int, int), float> newTemperatureMap = new();
-        float averageTemperature = 0;
-
-        // calculate each tile's distance from the equator and modulate the temperature based on that
-        // in addition calculate the average temperature of the entire map before altitudinal temperature modulation
-        // so that it can be used to drift the temperature values of tiles closer to the ocean towards the average
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            (int, int, int) key = entry.Key;
-            float altitude = entry.Value;
-            float temperature = temperatureMap[key];
-            int rCoord = key.Item2;
-            int sCoord = key.Item3;
-
-            float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
-            distanceFromEquator = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
-            float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, distanceFromEquator);
-
-            //newTemperature = Mathf.Pow(newTemperature, 0.75f + altitude);
-            //newTemperature *= Mathf.Lerp(1.5f, 0.5f, altitude);
-
-            averageTemperature += newTemperature;
-            newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
-        }
-        averageTemperature /= newTemperatureMap.Count;
-        Debug.Log($"Average temperature of the map: {averageTemperature}");
-
-        // modulate the temperature of tiles based on ocean proximity and altitude
-        foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
-        {
-            (int, int, int) key = entry.Key;
-            HexTile tile = grid.FetchTile(key);
-            if (tile.terrain != Terrain.Ocean)
-            {
-                float originalTemperature = newTemperatureMap[key];
-                float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
-                float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
-
-                float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
-                newTemperature = Mathf.Lerp(newTemperature / 1.5f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 2f));
-                newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
-            }
-        }
-
-        temperatureMap = newTemperatureMap;
-        return newTemperatureMap;
-    }
-
     public static void GenerateTerrainFeatures()
     {
         //GenerateElevationFeatures(grid, altitudeMap);
@@ -279,128 +400,6 @@ public class MapGeneration
         //GenerateRivers(grid);
         //GenerateForests(grid);
         return;
-    }
-
-    private Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
-    {
-        // mountain range generation
-        Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
-        Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(scale: 4f, exponent: 2f);
-        for (int i = 0; i < mountainRangeCount - 1; i++)
-        {
-            Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
-            foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
-            {
-                (int, int, int) key = entry.Key;
-                float tileElevationMask = Mathf.Lerp(mountainMask[key], 1f - Mathf.Abs(entry.Value * 2 - 1.0f), mixValueMask[key]);
-                mountainMask[key] = Mathf.Clamp01(tileElevationMask);
-            }
-        }
-
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            (int, int, int) key = entry.Key;
-            float tileMountainMask = Mathf.Pow(mountainMask[key], 1.5f);
-
-            float mixValue = Mathf.InverseLerp(grid.waterLevel, grid.waterLevel * 2f, altitudeMap[key]);
-            mixValue *= tileMountainMask;
-            tileMountainMask = Mathf.Lerp(altitudeMap[key], tileMountainMask + altitudeMap[key], mixValue);
-            mountainMask[key] = Mathf.Clamp01(tileMountainMask);
-        }
-
-        altitudeMap = mountainMask;
-        return altitudeMap;
-    }
-
-    private Dictionary<(int, int, int), float> GenerateWaterBoundary()
-    {
-        Dictionary<(int, int, int), float> newAltitudeMap = GenerateNoiseMap(scale: 8f);
-        foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
-        {
-            int qCoord = entry.Key.Item1;
-            int rCoord = entry.Key.Item2;
-            int sCoord = entry.Key.Item3;
-            float xDistance = Mathf.Abs(qCoord - (rCoord + sCoord)) / 2f;
-            xDistance = 2 * xDistance / grid.width;
-            float yDistance = Mathf.Abs(rCoord - sCoord) / 2f;
-            yDistance = 2 * yDistance / grid.height;
-
-            float shaping = Mathf.Pow(Mathf.Cos(xDistance * (Mathf.PI / 2)) * Mathf.Cos(yDistance * (Mathf.PI / 2)), 4f); // https://www.wolframalpha.com/input?i=plot+%28sin%28x*pi%29sin%28y*pi%29%29%5E4+from+0+to+1
-            float mixValue = Mathf.Pow(Mathf.Max(xDistance, yDistance), 1.75f);
-            mixValue *= 1f - Mathf.Pow(altitudeMap[entry.Key], 8f); // helps to preserve mountains near coasts, the exponent could be tweaked
-            mixValue *= Mathf.Lerp(0.75f, 1.25f, newAltitudeMap[entry.Key]); // adds a competing noise layer to the interpolation value
-            shaping = Mathf.Lerp(altitudeMap[entry.Key], shaping, mixValue);
-            newAltitudeMap[entry.Key] = shaping;
-        }
-
-        altitudeMap = newAltitudeMap;
-        return newAltitudeMap;
-    }
-
-    public Dictionary<(int, int, int), float> SimulateRainShadow()
-    {
-        Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
-        Debug.Log($"Wind direction: {windDirection.ToString()}");
-        List<HexTile> sortedTiles = grid.GetTilesArray()
-            .OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
-            .ToList();
-
-        // set initial cloud cover values for each tile before simulating the effect of rain shadow
-        Dictionary<(int, int, int), float> cloudCoverMap = new Dictionary<(int, int, int), float>();
-        foreach (HexTile tile in sortedTiles)
-        {
-            (int, int, int) key = tile.GetCoordinates().ToTuple();
-            float startingCloudCover = 0;
-            if (tile.terrain == Terrain.Ocean)
-            {
-                startingCloudCover = 1f;
-            }
-            else if (tile.terrain == Terrain.FreshWater)
-            {
-                startingCloudCover = 0.5f; // this value will need to be tweaked
-            }
-            else
-            {
-                startingCloudCover = 0.1f;
-                //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
-                //float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
-                //startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
-            }
-            cloudCoverMap[key] = startingCloudCover;
-        }
-
-        // simulate rain shadow for each tile
-        Dictionary<(int, int, int), float> rainShadowMap = new Dictionary<(int, int, int), float>();
-        foreach (HexTile tile in sortedTiles)
-        {
-            (int, int, int) key = tile.GetCoordinates().ToTuple();
-            float tileMaxCloudCover = 1f - tile.GetAltitude();
-            float tileCloudCover = Mathf.Min(cloudCoverMap[key], tileMaxCloudCover);
-            rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
-
-            (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
-            if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
-            {
-                float altitudeFactor = 1f - Mathf.Pow(tile.GetAltitude(), 1.5f);
-                cloudCoverMap[neighborKey] += tileCloudCover * altitudeFactor;
-            }
-        }
-
-        // simulate diffusion for sideways wind
-        Dictionary<(int, int, int), float> averagedRainShadowMap = new Dictionary<(int, int, int), float>();
-        foreach (HexTile tile in sortedTiles)
-        {
-            (int, int, int) key = tile.GetCoordinates().ToTuple();
-            float precipitationSum = rainShadowMap[key];
-            foreach (HexTile neighbor in tile.GetNeighbors())
-            {
-                precipitationSum += rainShadowMap[neighbor.GetCoordinates().ToTuple()];
-            }
-            averagedRainShadowMap[key] = precipitationSum / (tile.GetNeighbors().Length + 1);
-        }
-
-        precipitationMap = averagedRainShadowMap;
-        return averagedRainShadowMap;
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
@@ -442,8 +441,9 @@ public class MapGeneration
             }
         }
 
-        // river searching will probably need to do searching for low points in a bigger range to avoid getting stuck in local minima
-        // or alternatively when stuck in local minima make it into a lake and see if you can't derive further rivers from that
+        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
+        return rivers;
+
         List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
         {
             HexTile nextTile = null;
@@ -543,9 +543,6 @@ public class MapGeneration
 
         // TODO: handle the edge case where lakes can intersect a river and split it in two
         //       this isn't necessarily a bug but the split-off part of the river needs to be assigned into a new river list
-        // TODO: add some sort of biasing to make lakes form in a more circular manner, as currently they tend to snake a lot
-        //       this could be done by lowering a candidate tile's effective altitude based on how many of its neighboring tiles
-        //       are already a part of the same lake, (effectiveAltitude = tileAltitude * (1f - neighborTilesInLake * 0.1f))
         List<HexTile> BuildLake(List<HexTile> river)
         {
             Debug.Log("Attempting to create a lake from a river...", river[0]);
@@ -662,9 +659,6 @@ public class MapGeneration
             Debug.Log($"Created a lake of size {lake.Count}", lake[0]);
             return river;
         }
-
-        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
-        return rivers;
     }
 
     // this might need rivers added to it as well
