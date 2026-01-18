@@ -415,14 +415,15 @@ public class MapGeneration
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
 
+        int riverAvgLength = 10;
         foreach (HexTile tile in riverSourceCandidates)
         {
             //add checks here to make sure the tile is still a valid candidate
             float weight = tile.GetPrecipitation() * tile.GetAltitude();
             if (Random.value < weight)
             {
-                List<HexTile> newRiver = DoRiverRecursion(tile);
-                if (newRiver.Count > 2) // only include rivers that are big enough
+                List<HexTile> newRiver = DoRiverRecursion(tile, Random.Range(riverAvgLength - 3, riverAvgLength + 3));
+                if (newRiver.Count >= 3) // only include rivers that are big enough
                 {
                     rivers.Add(newRiver);
                     foreach (HexTile riverTile in newRiver)
@@ -444,7 +445,8 @@ public class MapGeneration
         Debug.Log($"Generated {rivers.Count} rivers from source candidates");
         return rivers;
 
-        List<HexTile> DoRiverRecursion(HexTile tile, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
+        // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
+        List<HexTile> DoRiverRecursion(HexTile tile, int riverMinimumLength, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
         {
             HexTile nextTile = null;
             riverTiles ??= new List<HexTile>();
@@ -472,7 +474,6 @@ public class MapGeneration
                 }
             }
 
-            //float lowestEffectiveAltitude = 1f;
             float lowestEffectiveAltitude = tile.GetAltitude();
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
@@ -514,12 +515,11 @@ public class MapGeneration
                         
                         float effectiveAltitude = neighbor.GetAltitude() - alignment * 0.15f;
                         effectiveAltitude += Random.Range(-0.02f, 0.02f);
-                        if (effectiveAltitude < lowestEffectiveAltitude)
+                        if (effectiveAltitude < lowestEffectiveAltitude || (riverTiles.Count < riverMinimumLength && nextTile == null))
                         {
                             nextTile = neighbor;
                             lowestEffectiveAltitude = effectiveAltitude;
                         }
-
                     }
                 }
             }
@@ -532,12 +532,13 @@ public class MapGeneration
                 }
                 else
                 {
+                    Debug.Assert(riverTiles.Count >= riverMinimumLength, $"Generated a river of length {riverTiles.Count} when minimum allowed size was {riverMinimumLength}", riverTiles[0]);
                     return riverTiles;
                 }
             }
             else
             {
-                return DoRiverRecursion(nextTile, biasTile, riverTiles);
+                return DoRiverRecursion(nextTile, riverMinimumLength, biasTile, riverTiles);
             }
         }
 
