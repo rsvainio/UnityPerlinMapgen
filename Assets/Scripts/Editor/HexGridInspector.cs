@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using TreeEditor;
@@ -72,11 +73,20 @@ public class HexGridInspector : Editor
 
             cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
 
-            if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); mapGenerator = new MapGeneration(grid); }
-            if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
+            //if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); mapGenerator = new MapGeneration(grid); }
+            //if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
             if (GUILayout.Button("Generate Noisemaps"))
             {
-                grid.ResetGrid(); // reset the grid to make sure previous tile values aren't used in this run
+                if (grid.GetTiles().Count != grid.height * grid.width)
+                {
+                    Debug.Log("Tile count differs from grid size, regenerating...");
+                    GenerateGrid(grid);
+                    mapGenerator = new MapGeneration(grid);
+                }
+                else
+                {
+                    grid.ResetGrid(); // reset the grid to make sure previous tile values aren't used in this run
+                }
 
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
                 if (generateAltitudeMap) { mapGenerator.GenerateAltitudeMap(scale: this.altitudeScale, exponent: this.altitudeExponent,
@@ -237,20 +247,21 @@ public class HexGridInspector : Editor
             singleColor = EditorGUILayout.Toggle("Single color mountains", singleColor);
             averageElevationFeatures = EditorGUILayout.Toggle("Elevation features by average", averageElevationFeatures);
 
-            if (GUILayout.Button("Generate Grid"))
-            {
-                mapGenerator = new MapGeneration(grid);
-                GenerateGrid(grid);
-            }
-
-            if (GUILayout.Button("Clear Grid"))
-            {
-                mapGenerator = new MapGeneration(grid);
-                ClearGrid(grid);
-            }
-
+            //if (GUILayout.Button("Generate Grid")) { mapGenerator = new MapGeneration(grid); GenerateGrid(grid); }
+            //if (GUILayout.Button("Clear Grid")) { mapGenerator = new MapGeneration(grid); ClearGrid(grid); }
             if (GUILayout.Button("Generate Mountain Ranges"))
             {
+                if (grid.GetTiles().Count != grid.height * grid.width)
+                {
+                    Debug.Log("Tile count differs from grid size, regenerating...");
+                    GenerateGrid(grid);
+                    mapGenerator = new MapGeneration(grid);
+                }
+                else
+                {
+                    grid.ResetGrid(); // reset the grid to make sure previous tile values aren't used in this run
+                }
+
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
                 HexTile[] tiles = grid.GetTilesArray();
