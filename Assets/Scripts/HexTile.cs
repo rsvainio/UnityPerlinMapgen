@@ -21,6 +21,14 @@ public class HexTile : MonoBehaviour
         this.grid = grid;
     }
 
+    // resets the iteration-specific attributes of the tile
+    public void ResetTile()
+    {
+        SetBiomeAttributes(0f, 0f, 0f);
+        SetTerrain(null);
+        hasRiver = false;
+    }
+
     public HexCoordinates GetCoordinates()
     {
         return coordinates;

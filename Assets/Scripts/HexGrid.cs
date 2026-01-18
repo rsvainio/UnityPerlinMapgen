@@ -50,8 +50,7 @@ public class HexGrid : MonoBehaviour
     {
         foreach (HexTile tile in tiles.Values)
         {
-            tile.SetTerrain(null);
-            tile.SetBiomeAttributes(0f, 0f, 0f);
+            tile.ResetTile();
         }
         rivers.Clear();
     }
