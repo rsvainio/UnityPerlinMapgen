@@ -35,13 +35,15 @@ public class HexTile : MonoBehaviour
     }
 
     public float GetPrecipitation() { return precipitation; }
-    public void SetPrecipitation(float precipitation) { this.precipitation = precipitation; }
+    public void SetPrecipitation(float precipitation) { SetBiomeAttributes(precipitation, this.altitude, this.temperature); }
     public float GetAltitude() { return altitude; }
-    public void SetAltitude(float altitude) { this.altitude = altitude; }
+    public void SetAltitude(float altitude) { SetBiomeAttributes(this.precipitation, altitude, this.temperature); }
     public float GetTemperature() { return temperature; }
-    public void SetTemperature(float temperature) { this.temperature = temperature; } 
+    public void SetTemperature(float temperature) { SetBiomeAttributes(this.precipitation, this.altitude, temperature); } 
     public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
     {
+        Debug.Assert(!float.IsNaN(precipitation) && !float.IsNaN(altitude) && !float.IsNaN(temperature), 
+            $"Attempted to set a NaN biome attribute, precipitation: {precipitation}, altitude: {altitude}, temperature: {temperature}", this);
         this.precipitation = precipitation;
         this.altitude = altitude;
         this.temperature = temperature;
@@ -55,7 +57,7 @@ public class HexTile : MonoBehaviour
         //GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;
     }
 
-    //returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null when the function is called
+    // returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null at call time
     public HexTile[] GetNeighbors()
     {
         if (neighbors == null)
@@ -109,15 +111,18 @@ public class HexTile : MonoBehaviour
             for (int r = Mathf.Max(-range, -q - range); r <= Mathf.Min(range, -q + range); r++)
             {
                 int s = -q - r;
-                results.Add(grid.FetchTile((q, r, s)));
+                if (grid.GetTiles().TryGetValue((q, r, s), out HexTile tile))
+                {
+                    results.Add(tile);
+                }
             }
         }
 
         return results;
     }
 
-    //returns an array consisting of the coordinates of neighboring hexTiles
-    //since the class has no knowledge of the boundaries of the map, there's a chance of returning coordinates that don't correspond to any actual hexTiles
+    // returns an array consisting of the coordinates of neighboring hexTiles
+    // since the class has no knowledge of the boundaries of the map, there's a chance of returning coordinates that don't correspond to any actual hexTiles
     public HexCoordinates[] GetNeighborCoordinates()
     {
         HexCoordinates[] neighborCoordinates;
