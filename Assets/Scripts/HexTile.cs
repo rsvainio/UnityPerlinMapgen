@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 public class HexTile : MonoBehaviour
@@ -63,16 +64,17 @@ public class HexTile : MonoBehaviour
         if (neighbors == null)
         {
             HexCoordinates[] neighborCoordinates = GetNeighborCoordinates();
+            Dictionary<(int, int, int), HexTile> gridTiles = grid.GetTiles();
             neighbors = new HexTile[neighborCoordinates.Length];
             int j = 0;
 
             for (int i = 0; i < neighbors.Length; i++)
             {
-                try
+                if (gridTiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
                 {
-                    neighbors[i - j] = grid.FetchTile(neighborCoordinates[i].ToTuple());
+                    neighbors[i - j] = tile;
                 }
-                catch(ArgumentException)
+                else
                 {
                     j++;
                 }

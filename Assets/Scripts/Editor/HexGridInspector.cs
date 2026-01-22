@@ -369,7 +369,7 @@ public class HexGridInspector : Editor
 
                 foreach ((int, int, int) key in mountainMask.Keys.ToList())
                 {
-                    HexTile tile = grid.FetchTile(key);
+                    HexTile tile = grid.GetTiles()[key];
                     float altitude = mountainMask[key];
                     if (altitude >= 0.7f)
                     {

@@ -62,19 +62,6 @@ public class HexGrid : MonoBehaviour
             HandleInput();
         }
     }
-    
-
-    public HexTile FetchTile((int, int, int) key) 
-    {
-        if (tiles.TryGetValue(key, out HexTile tile))
-        {
-            return tile;
-        }
-        else
-        {
-            throw new ArgumentException("No tile found at coordinates " + key.ToString());
-        }
-    }
 
     public Dictionary<(int, int, int), HexTile> GetTiles()
     {

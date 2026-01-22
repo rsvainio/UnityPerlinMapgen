@@ -68,7 +68,7 @@ public class MapGeneration
         // assign precipitation values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in precipitationMap)
         {
-            grid.FetchTile(entry.Key).SetPrecipitation(entry.Value);
+            grid.GetTiles()[entry.Key].SetPrecipitation(entry.Value);
         }
 
         return precipitationMap;
@@ -168,7 +168,7 @@ public class MapGeneration
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
-            grid.FetchTile(entry.Key).SetAltitude(entry.Value);
+            grid.GetTiles()[entry.Key].SetPrecipitation(entry.Value);
         }
 
         CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
@@ -249,7 +249,7 @@ public class MapGeneration
         // assign temperature values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
         {
-            grid.FetchTile(entry.Key).SetTemperature(entry.Value);
+            grid.GetTiles()[entry.Key].SetPrecipitation(entry.Value);
         }
 
         return temperatureMap;
@@ -291,7 +291,7 @@ public class MapGeneration
             foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
             {
                 (int, int, int) key = entry.Key;
-                HexTile tile = grid.FetchTile(key);
+                HexTile tile = grid.GetTiles()[key];
                 if (tile.terrain != Terrain.Ocean)
                 {
                     float originalTemperature = newTemperatureMap[key];
@@ -311,6 +311,8 @@ public class MapGeneration
 
     //map generation presets could potentially be expressed as these parameter values
     //i.e. a flatlands map would have a high exponent with low scale
+    // TODO: generated noise maps currently always generate the same area of space, but just resized to the grid's size
+    //       they should instead not scale the output to the grid's size but generate as much space as the grid can fit
     public Dictionary<(int, int, int), float> GenerateNoiseMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4)
     {
         Dictionary<(int, int, int), float> noiseMap = new Dictionary<(int, int, int), float>();
@@ -760,7 +762,7 @@ public class MapGeneration
         foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
         {
             (int, int, int) key = entry.Key;
-            HexTile tile = grid.FetchTile(key);
+            HexTile tile = grid.GetTiles()[key];
             if (entry.Value == 0f) { tilesWith0Value++; }
 
             int neighborBoundaryTiles = 0;
