@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 public class HexGrid : MonoBehaviour
@@ -23,6 +21,11 @@ public class HexGrid : MonoBehaviour
     public List<HexTile> borderTiles = new List<HexTile>();
     public List<List<HexTile>> rivers = new List<List<HexTile>>();
     public float waterLevel = 0.175f; // this will probably be moved elsewhere later
+
+    public void Awake()
+    {
+        TerrainDatabase.LoadTerrains();
+    }
 
     public void Initialize()
     {
@@ -220,22 +223,22 @@ public class HexGrid : MonoBehaviour
         }
     }
 
-    public void ReadTerrainTypes(){
-        String filepath = "Assets/PersistentData/TileTerrains";
+    //public void ReadTerrainTypes(){
+    //    String filepath = "Assets/PersistentData/TileTerrains";
 
-        if (Directory.Exists(filepath)){
-            DirectoryInfo d = new DirectoryInfo(filepath);
-            foreach (var file in d.GetFiles("*.json")){
-                if (!file.Name.ToLower().Contains("template")){
-                    var jsonData = File.ReadAllText(file.ToString());
-                    Terrain terrain = Terrain.CreateFromJSON(jsonData);
+    //    if (Directory.Exists(filepath)){
+    //        DirectoryInfo d = new DirectoryInfo(filepath);
+    //        foreach (var file in d.GetFiles("*.json")){
+    //            if (!file.Name.ToLower().Contains("template")){
+    //                var jsonData = File.ReadAllText(file.ToString());
+    //                Terrain terrain = Terrain.CreateFromJSON(jsonData);
                     
-                    //Debug.Log(terrain.id);
-                    Debug.Log(terrain.baseMovementCost);
-                    Debug.Log(terrain.baseColor);
-                    Debug.Log(terrain.ToString());
-                }
-            }
-        }
-    }
+    //                //Debug.Log(terrain.id);
+    //                Debug.Log(terrain.baseMovementCost);
+    //                Debug.Log(terrain.baseColor);
+    //                Debug.Log(terrain.ToString());
+    //            }
+    //        }
+    //    }
+    //}
 }
