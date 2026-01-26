@@ -87,11 +87,11 @@ public class MapGeneration
             {
                 (int, int, int) key = tile.GetCoordinates().ToTuple();
                 float startingCloudCover = 0;
-                if (tile.terrain == Terrain.Ocean)
+                if (tile.terrain == TerrainDatabase.ocean)
                 {
                     startingCloudCover = 1f;
                 }
-                else if (tile.terrain == Terrain.FreshWater)
+                else if (tile.terrain == TerrainDatabase.freshWater)
                 {
                     startingCloudCover = 0.5f; // this value will need to be tweaked
                 }
@@ -292,7 +292,7 @@ public class MapGeneration
             {
                 (int, int, int) key = entry.Key;
                 HexTile tile = grid.GetTiles()[key];
-                if (tile.terrain != Terrain.Ocean)
+                if (tile.terrain != TerrainDatabase.ocean)
                 {
                     float originalTemperature = newTemperatureMap[key];
                     float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
@@ -463,7 +463,7 @@ public class MapGeneration
                 {
                     if (!riverTiles.Contains(searchTile))
                     {
-                        if (searchTile.HasRiver() || searchTile.GetTerrain() == Terrain.Ocean || searchTile.GetTerrain() == Terrain.FreshWater)
+                        if (searchTile.HasRiver() || searchTile.GetTerrain() == TerrainDatabase.ocean || searchTile.GetTerrain() == TerrainDatabase.freshWater)
                         {
                             int newDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), searchTile.GetCoordinates());
                             if (newDistance < oldDistance || oldDistance == 0)
@@ -479,7 +479,7 @@ public class MapGeneration
             float lowestEffectiveAltitude = tile.GetAltitude();
             foreach (HexTile neighbor in tile.GetNeighbors())
             {
-                if (neighbor.GetTerrain() == Terrain.Ocean || neighbor.GetTerrain() == Terrain.FreshWater) // the neighbouring tile is a water tile so the river terminates
+                if (neighbor.GetTerrain() == TerrainDatabase.ocean || neighbor.GetTerrain() == TerrainDatabase.freshWater) // the neighbouring tile is a water tile so the river terminates
                 {
                     return riverTiles;
                 }
@@ -580,7 +580,7 @@ public class MapGeneration
 
             List<HexTile> lake = new List<HexTile>();
             List<HexTile> lakeNeighbors = new List<HexTile>();
-            Terrain newLakeTerrain = Terrain.FreshWater;
+            Terrain newLakeTerrain = TerrainDatabase.freshWater;
             lake.Add(lakeStartCandidate);
             foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
 
@@ -595,13 +595,13 @@ public class MapGeneration
                     float neighborAltitude = neighbor.GetAltitude();
                     // encountering either another lake or an ocean will result in the current lake being terminated,
                     // but it'll likely create a noticeable artefact where the two bodies of water connect with only 1 tile
-                    if (terrain == Terrain.Ocean || terrain == Terrain.FreshWater)
+                    if (terrain == TerrainDatabase.ocean || terrain == TerrainDatabase.freshWater)
                     {
                         lake.Add(neighbor);
                         newLakeTerrain = terrain;
                         nextLakeTile = null;
 
-                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != Terrain.Ocean || x.terrain != Terrain.FreshWater))
+                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != TerrainDatabase.ocean || x.terrain != TerrainDatabase.freshWater))
                         {
                             if (!lake.Contains(tile))
                             {
@@ -676,9 +676,9 @@ public class MapGeneration
 
         void DoOceanMappingRecursion(HexTile tile)
         {
-            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
+            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != TerrainDatabase.ocean)
             {
-                tile.SetTerrain(Terrain.Ocean);
+                tile.SetTerrain(TerrainDatabase.ocean);
                 foreach (HexTile neighborTile in tile.GetNeighbors())
                 {
                     DoOceanMappingRecursion(neighborTile);
@@ -694,9 +694,9 @@ public class MapGeneration
         // assign terrain to non-oceanic water tiles
         foreach (HexTile tile in grid.GetTilesArray())
         {
-            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != Terrain.Ocean)
+            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != TerrainDatabase.ocean)
             {
-                tile.SetTerrain(Terrain.FreshWater);
+                tile.SetTerrain(TerrainDatabase.freshWater);
             }
         }
 
@@ -710,7 +710,7 @@ public class MapGeneration
         foreach (HexTile tile in grid.GetTilesArray())
         {
             int distanceFromNearestOcean = 0;
-            if (tile.terrain != Terrain.Ocean)
+            if (tile.terrain != TerrainDatabase.ocean)
             {
                 // do a breadth-first search to make sure that it is actually the nearest ocean tile that is found
                 Queue<HexTile> tileQueue = new Queue<HexTile>();
@@ -725,7 +725,7 @@ public class MapGeneration
                 while (tileQueue.Count > 0)
                 {
                     HexTile neighborTile = tileQueue.Dequeue();
-                    if (neighborTile.terrain == Terrain.Ocean)
+                    if (neighborTile.terrain == TerrainDatabase.ocean)
                     {
                         distanceFromNearestOcean = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
                         //float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());

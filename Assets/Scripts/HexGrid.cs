@@ -11,10 +11,7 @@ public class HexGrid : MonoBehaviour
     public Color touchedColor = Color.magenta;
     public HexTile tilePrefab;
     public Text tileLabelPrefab;
-    public Terrain[] terrainList;
 
-    //might make this into a dictionary with the key being a TerrainType object, and the value being the Mesh for that type of terrain
-    //e.g. public Dictionary<TerrainType, Mesh> terrainMeshes = new Dictionary<(TerrainType, Mesh>());
     Mesh hexMesh = null;
 
     public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
@@ -35,7 +32,6 @@ public class HexGrid : MonoBehaviour
         GenerateGrid();
         BuildBorderTileList();
         //MapGeneration.GenerateCellularAutomataMap(this);
-        //ReadTerrainTypes();
     }
 
     public void DestroyGrid()
@@ -222,23 +218,4 @@ public class HexGrid : MonoBehaviour
             }
         }
     }
-
-    //public void ReadTerrainTypes(){
-    //    String filepath = "Assets/PersistentData/TileTerrains";
-
-    //    if (Directory.Exists(filepath)){
-    //        DirectoryInfo d = new DirectoryInfo(filepath);
-    //        foreach (var file in d.GetFiles("*.json")){
-    //            if (!file.Name.ToLower().Contains("template")){
-    //                var jsonData = File.ReadAllText(file.ToString());
-    //                Terrain terrain = Terrain.CreateFromJSON(jsonData);
-                    
-    //                //Debug.Log(terrain.id);
-    //                Debug.Log(terrain.baseMovementCost);
-    //                Debug.Log(terrain.baseColor);
-    //                Debug.Log(terrain.ToString());
-    //            }
-    //        }
-    //    }
-    //}
 }

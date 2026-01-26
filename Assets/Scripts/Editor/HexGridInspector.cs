@@ -117,7 +117,7 @@ public class HexGridInspector : Editor
                     if (generateAltitudeMap)
                     {
                         Terrain terrain = tile.GetTerrain();
-                        if (altitude <= grid.waterLevel || terrain == Terrain.FreshWater || terrain == Terrain.Ocean)
+                        if (altitude <= grid.waterLevel || terrain == TerrainDatabase.freshWater || terrain == TerrainDatabase.ocean)
                         {
                             altitudeColor = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
                         }

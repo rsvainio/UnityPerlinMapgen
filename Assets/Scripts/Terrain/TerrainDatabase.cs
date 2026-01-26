@@ -16,4 +16,8 @@ public static class TerrainDatabase
             terrains[terrain.id] = terrain;
         }
     }
+
+    // references to default terrains for convenience
+    public static readonly Terrain ocean = GetTerrain("ocean");
+    public static readonly Terrain freshWater = GetTerrain("freshWater");
 }
