@@ -9,10 +9,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6a396feee2d9ed04fa56992a9c4a2a0d, type: 3}
-  m_Name: Fresh water
+  m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
+  m_Name: freshWater
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: freshWater
-  displayName: Fresh water
-  baseColor: {r: 0.23696157, g: 0.4268041, b: 0.7075472, a: 0}
+  id: ocean
+  displayName: Ocean
+  baseColor: {r: 0.12001601, g: 0.14704813, b: 0.8207547, a: 0}
   baseMovementCost: 1

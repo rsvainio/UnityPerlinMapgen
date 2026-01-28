@@ -3,51 +3,48 @@ using System.Collections.Generic;
 
 namespace Terrain
 {
-    [CreateAssetMenu(menuName = "Terrain/Terrain Type")]
-    public class TerrainType : ScriptableObject
-    {
-        [Header("Info")]
-        public string id;
-        public string displayName;
-        public Color baseColor;
-        [Header("Gameplay")]
-        public float baseMovementCost;
-        //public bool isWalkable;
-
-        public TerrainType(string displayName, float baseMovementCost, Color baseColor)
-        {
-            this.displayName = displayName;
-            this.baseMovementCost = baseMovementCost;
-            this.baseColor = baseColor;
-        }
-    }
-
     public static class TerrainDatabase
     {
         private static readonly Dictionary<string, TerrainType> terrainTypes = new();
+        private static readonly Dictionary<string, TerrainFeature> terrainFeatures = new();
 
         public static TerrainType GetTerrainType(string id) => terrainTypes[id];
+        public static TerrainFeature GetTerrainFeature(string id) => terrainFeatures[id];
 
         private static void LoadTerrainTypes()
         {
-            TerrainType[] terrainArray = Resources.LoadAll<TerrainType>("TerrainTypes");
-            Debug.Log($"Loaded {terrainArray.Length} TerrainTypes");
-
+            TerrainType[] terrainArray = Resources.LoadAll<TerrainType>("TerrainResources/TerrainTypes");
             foreach (TerrainType terrainType in terrainArray)
             {
                 terrainTypes[terrainType.id] = terrainType;
             }
         }
 
+        private static void LoadTerrainFeatures()
+        {
+            TerrainFeature[] terrainArray = Resources.LoadAll<TerrainFeature>("TerrainResources/TerrainFeatures");
+            foreach (TerrainFeature terrainFeature in terrainArray)
+            {
+                terrainFeatures[terrainFeature.id] = terrainFeature;
+            }
+        }
+
         static TerrainDatabase()
         {
             LoadTerrainTypes();
+            LoadTerrainFeatures();
+            Debug.Log($"Loaded {terrainTypes.Count} TerrainTypes and {terrainFeatures.Count} TerrainFeatures");
         }
     }
 
     public static class TerrainTypes
     {
-        public static TerrainType ocean = TerrainDatabase.GetTerrainType("ocean");
-        public static TerrainType freshWater = TerrainDatabase.GetTerrainType("freshWater");
+        public static readonly TerrainType ocean = TerrainDatabase.GetTerrainType("ocean");
+        public static readonly TerrainType freshWater = TerrainDatabase.GetTerrainType("freshWater");
+    }
+
+    public static class TerrainFeatures
+    {
+        public static readonly TerrainFeature forest = TerrainDatabase.GetTerrainFeature("forest");
     }
 }
