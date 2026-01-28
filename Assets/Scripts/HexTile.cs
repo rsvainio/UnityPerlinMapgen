@@ -1,19 +1,20 @@
 using System;
 using System.Collections.Generic;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using Terrain;
 
 public class HexTile : MonoBehaviour
 {
     private HexCoordinates coordinates;
     private HexGrid grid;
     public string stringcoords;
-    public Terrain terrain;
     private HexTile[] neighbors;
+
+    public TerrainType terrain;
     [SerializeField] private float precipitation, altitude, temperature;
     private bool hasRiver = false;
 
-    public void Initialize(int q, int r, int s, Terrain terrain, HexGrid grid)
+    public void Initialize(int q, int r, int s, TerrainType terrain, HexGrid grid)
     {
         this.coordinates = new HexCoordinates(q, r, s);
         this.stringcoords = $"{q}, {r}, {s}";
@@ -35,24 +36,36 @@ public class HexTile : MonoBehaviour
         return coordinates;
     }
 
+    //public float GetPrecipitation() { return precipitation; }
+    //public void SetPrecipitation(float precipitation) { SetBiomeAttributes(precipitation, this.altitude, this.temperature); }
+    //public float GetAltitude() { return altitude; }
+    //public void SetAltitude(float altitude) { SetBiomeAttributes(this.precipitation, altitude, this.temperature); }
+    //public float GetTemperature() { return temperature; }
+    //public void SetTemperature(float temperature) { SetBiomeAttributes(this.precipitation, this.altitude, temperature); } 
+    //public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
+    //{
+    //    Debug.Assert(!float.IsNaN(precipitation) && !float.IsNaN(altitude) && !float.IsNaN(temperature), 
+    //        $"Attempted to set a NaN biome attribute, precipitation: {precipitation}, altitude: {altitude}, temperature: {temperature}", this);
+    //    this.precipitation = precipitation;
+    //    this.altitude = altitude;
+    //    this.temperature = temperature;
+    //}
     public float GetPrecipitation() { return precipitation; }
-    public void SetPrecipitation(float precipitation) { SetBiomeAttributes(precipitation, this.altitude, this.temperature); }
+    public void SetPrecipitation(float precipitation) { this.precipitation = precipitation; }
     public float GetAltitude() { return altitude; }
-    public void SetAltitude(float altitude) { SetBiomeAttributes(this.precipitation, altitude, this.temperature); }
+    public void SetAltitude(float altitude) { this.altitude = altitude; }
     public float GetTemperature() { return temperature; }
-    public void SetTemperature(float temperature) { SetBiomeAttributes(this.precipitation, this.altitude, temperature); } 
+    public void SetTemperature(float temperature) { this.temperature = temperature; }
     public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
     {
-        Debug.Assert(!float.IsNaN(precipitation) && !float.IsNaN(altitude) && !float.IsNaN(temperature), 
-            $"Attempted to set a NaN biome attribute, precipitation: {precipitation}, altitude: {altitude}, temperature: {temperature}", this);
         this.precipitation = precipitation;
         this.altitude = altitude;
         this.temperature = temperature;
     }
     public bool HasRiver() { return hasRiver;  }
     public void SetHasRiver(bool hasRiver) { this.hasRiver = hasRiver; }
-    public Terrain GetTerrain() { return terrain; }
-    public void SetTerrain(Terrain terrain)
+    public TerrainType GetTerrain() { return terrain; }
+    public void SetTerrain(TerrainType terrain)
     {
         this.terrain = terrain;
         //GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;

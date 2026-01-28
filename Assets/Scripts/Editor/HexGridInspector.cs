@@ -1,11 +1,8 @@
-using System;
 using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
-using System.Drawing.Drawing2D;
 using System.Linq;
-using TreeEditor;
 using UnityEditor;
 using UnityEngine;
+using Terrain;
 
 [CustomEditor(typeof(HexGrid))]
 public class HexGridInspector : Editor
@@ -116,8 +113,8 @@ public class HexGridInspector : Editor
                     Color precipitationColor = new Color(0f, 0f, 0f);
                     if (generateAltitudeMap)
                     {
-                        Terrain terrain = tile.GetTerrain();
-                        if (altitude <= grid.waterLevel || terrain == TerrainDatabase.freshWater || terrain == TerrainDatabase.ocean)
+                        TerrainType terrain = tile.GetTerrain();
+                        if (altitude <= grid.waterLevel || terrain == TerrainTypes.freshWater || terrain == TerrainTypes.ocean)
                         {
                             altitudeColor = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
                         }
