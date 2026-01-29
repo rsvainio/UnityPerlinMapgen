@@ -74,7 +74,7 @@ public class HexGridInspector : Editor
             //if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
             if (GUILayout.Button("Generate Noisemaps"))
             {
-                if (grid.GetTiles().Count != grid.height * grid.width)
+                if (grid.tiles.Count != grid.height * grid.width)
                 {
                     Debug.Log("Tile count differs from grid size, regenerating...");
                     GenerateGrid(grid);
@@ -93,7 +93,7 @@ public class HexGridInspector : Editor
 
                 if (generateRivers) { grid.rivers = mapGenerator.GenerateRivers(); }
 
-                foreach (HexTile tile in grid.GetTilesArray())
+                foreach (HexTile tile in grid.tilesArray)
                 {
                     //(int, int, int) coordinates = tile.coordinates.ToTuple();
 
@@ -176,7 +176,7 @@ public class HexGridInspector : Editor
                 ////testing rain shadow calculation
                 //Vector3 windDirection = HexMetrics.ConvertDegreesToVector(90);
                 //Debug.Log($"Wind direction: {windDirection.ToString()}");
-                //List<HexTile> sortedTiles = grid.GetTilesArray()
+                //List<HexTile> sortedTiles = grid.tilesArray
                 //.OrderBy(t => Vector3.Dot(t.coordinates.ToVec3(), windDirection))
                 //.ToList();
 
@@ -196,13 +196,13 @@ public class HexGridInspector : Editor
             if (GUILayout.Button("Cellular automata pass"))
             {
                 Dictionary<(int, int, int), float> altitudeMap = new();
-                foreach (HexTile tile in grid.GetTilesArray())
+                foreach (HexTile tile in grid.tilesArray)
                 {
                     altitudeMap.Add(tile.coordinates.ToTuple(), tile.altitude);
                 }
                 altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
 
-                foreach (HexTile tile in grid.GetTilesArray())
+                foreach (HexTile tile in grid.tilesArray)
                 {
                     (int, int, int) coordinates = tile.coordinates.ToTuple();
                     float altitude = altitudeMap[coordinates];
@@ -248,7 +248,7 @@ public class HexGridInspector : Editor
             //if (GUILayout.Button("Clear Grid")) { mapGenerator = new MapGeneration(grid); ClearGrid(grid); }
             if (GUILayout.Button("Generate Mountain Ranges"))
             {
-                if (grid.GetTiles().Count != grid.height * grid.width)
+                if (grid.tiles.Count != grid.height * grid.width)
                 {
                     Debug.Log("Tile count differs from grid size, regenerating...");
                     GenerateGrid(grid);
@@ -261,7 +261,7 @@ public class HexGridInspector : Editor
 
                 if (customSeed != 0) { UnityEngine.Random.InitState(customSeed); }
 
-                HexTile[] tiles = grid.GetTilesArray();
+                HexTile[] tiles = grid.tilesArray;
                 Color[] mountainRangeColors = {Color.green, Color.red, Color.blue, Color.yellow, Color.purple};
 
                 for(int i = 0; i < mountainRangeCount; i++)
@@ -366,7 +366,7 @@ public class HexGridInspector : Editor
 
                 foreach ((int, int, int) key in mountainMask.Keys.ToList())
                 {
-                    HexTile tile = grid.GetTiles()[key];
+                    HexTile tile = grid.tiles[key];
                     float altitude = mountainMask[key];
                     if (altitude >= 0.7f)
                     {

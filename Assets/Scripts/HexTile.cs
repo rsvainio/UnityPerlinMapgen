@@ -42,7 +42,7 @@ public class HexTile : MonoBehaviour
     private HexTile[] GetNeighbors()
     {
         HexCoordinates[] neighborCoordinates = GetNeighborCoordinates();
-        Dictionary<(int, int, int), HexTile> _gridTiles = _grid.GetTiles();
+        Dictionary<(int, int, int), HexTile> _gridTiles = _grid.tiles;
         _neighbors = new HexTile[neighborCoordinates.Length];
         int j = 0;
 
@@ -89,7 +89,7 @@ public class HexTile : MonoBehaviour
             for (int r = Mathf.Max(-range, -q - range); r <= Mathf.Min(range, -q + range); r++)
             {
                 int s = -q - r;
-                if (_grid.GetTiles().TryGetValue((q, r, s), out HexTile tile))
+                if (_grid.tiles.TryGetValue((q, r, s), out HexTile tile))
                 {
                     results.Add(tile);
                 }

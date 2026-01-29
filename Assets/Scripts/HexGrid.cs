@@ -7,21 +7,21 @@ using UnityEngine.UI;
 public class HexGrid : MonoBehaviour
 {
     public int width, height;
-    public Color defaultColor = Color.white;
-    public Color touchedColor = Color.magenta;
+    public Dictionary<(int, int, int), HexTile> tiles { get; private set; } = new Dictionary<(int, int, int), HexTile>();
+    public HexTile[] tilesArray => tiles.Values.ToArray();
+    public List<HexTile> borderTiles { get; private set; } = new List<HexTile>();
+    public List<List<HexTile>> rivers { get; set; } = new List<List<HexTile>>();
+    public readonly float waterLevel = 0.175f; // this will probably be moved elsewhere later
+    public Color defaultColor { get; set; } = Color.white ;
+    public Color touchedColor { get; set; } = Color.magenta;
     public HexTile tilePrefab;
     public Text tileLabelPrefab;
 
-    Mesh hexMesh = null;
-
-    public Dictionary<(int, int, int), HexTile> tiles = new Dictionary<(int, int, int), HexTile>();
-    public List<HexTile> borderTiles = new List<HexTile>();
-    public List<List<HexTile>> rivers = new List<List<HexTile>>();
-    public float waterLevel = 0.175f; // this will probably be moved elsewhere later
-
+    private Mesh _hexMesh = null;
+    
     public void Initialize()
     {
-        if (hexMesh == null) { GenerateHexMesh(); }
+        if (_hexMesh == null) { GenerateHexMesh(); }
         if (tiles.Count != 0) { DestroyGrid(); }
 
         GenerateGrid();
@@ -55,16 +55,6 @@ public class HexGrid : MonoBehaviour
         {
             HandleInput();
         }
-    }
-
-    public Dictionary<(int, int, int), HexTile> GetTiles()
-    {
-        return tiles;
-    }
-
-    public HexTile[] GetTilesArray()
-    {
-        return tiles.Values.ToArray();
     }
 
     private void HandleInput()
@@ -144,8 +134,8 @@ public class HexGrid : MonoBehaviour
     {
         HexTile tile = Instantiate<HexTile>(tilePrefab, position, Quaternion.identity, transform);
         tile.Initialize(q, r, s, null, this); // change how the terrain is assigned
-        tile.GetComponentInChildren<MeshFilter>().mesh = hexMesh;
-        tile.GetComponentInChildren<MeshCollider>().sharedMesh = hexMesh;
+        tile.GetComponentInChildren<MeshFilter>().mesh = _hexMesh;
+        tile.GetComponentInChildren<MeshCollider>().sharedMesh = _hexMesh;
         
         /*
         Text label = Instantiate<Text>(tileLabelPrefab);
@@ -186,7 +176,7 @@ public class HexGrid : MonoBehaviour
         //mesh.uv = uvs.ToArray();
         mesh.name = "Hex Tile";
         mesh.RecalculateNormals();
-        hexMesh = mesh;
+        _hexMesh = mesh;
 
         void AddTriangle(Vector3 v2, Vector3 v3)
         {
@@ -205,7 +195,7 @@ public class HexGrid : MonoBehaviour
 
     private void BuildBorderTileList()
     {
-        foreach (HexTile tile in GetTilesArray())
+        foreach (HexTile tile in tilesArray)
         {
             if (tile.neighbors.Length != 6) // add this tile to the list of map border tiles if it has fewer than 6 neighbors
             {

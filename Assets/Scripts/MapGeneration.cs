@@ -4,7 +4,6 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 using Vector3 = UnityEngine.Vector3;
 using Terrain;
-using UnityEngine.Tilemaps;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -40,7 +39,7 @@ public class MapGeneration
         // assign precipitation values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in precipitationMap)
         {
-            grid.GetTiles()[entry.Key].precipitation = entry.Value;
+            grid.tiles[entry.Key].precipitation = entry.Value;
         }
 
         return precipitationMap;
@@ -49,7 +48,7 @@ public class MapGeneration
         {
             Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
             Debug.Log($"Wind direction: {windDirection.ToString()}");
-            List<HexTile> sortedTiles = grid.GetTilesArray()
+            List<HexTile> sortedTiles = grid.tilesArray
                 .OrderBy(t => Vector3.Dot(t.coordinates.ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
                 .ToList();
 
@@ -87,7 +86,7 @@ public class MapGeneration
                 rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
 
                 (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
-                if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
+                if (grid.tiles.TryGetValue(neighborKey, out HexTile downwindTile))
                 {
                     float altitudeFactor = 1f - Mathf.Pow(tile.altitude, 1.5f);
                     cloudCoverMap[neighborKey] += tileCloudCover * altitudeFactor;
@@ -140,7 +139,7 @@ public class MapGeneration
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
-            grid.GetTiles()[entry.Key].altitude = entry.Value;
+            grid.tiles[entry.Key].altitude = entry.Value;
         }
 
         CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
@@ -221,7 +220,7 @@ public class MapGeneration
         // assign temperature values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
         {
-            grid.GetTiles()[entry.Key].temperature = entry.Value;
+            grid.tiles[entry.Key].temperature = entry.Value;
         }
 
         return temperatureMap;
@@ -263,7 +262,7 @@ public class MapGeneration
             foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
             {
                 (int, int, int) key = entry.Key;
-                HexTile tile = grid.GetTiles()[key];
+                HexTile tile = grid.tiles[key];
                 if (tile.terrain != TerrainTypes.ocean)
                 {
                     float originalTemperature = newTemperatureMap[key];
@@ -295,7 +294,7 @@ public class MapGeneration
         float offsetQShared = Random.Range(0f, 100f);
         float offsetRShared = Random.Range(0f, 100f);
 
-        foreach (HexTile tile in grid.GetTilesArray())
+        foreach (HexTile tile in grid.tilesArray)
         {
             HexCoordinates coordinates = tile.coordinates;
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
@@ -338,7 +337,7 @@ public class MapGeneration
         float sin = Mathf.Sin(angle);
         float cos = Mathf.Cos(angle);
 
-        foreach (HexTile tile in grid.GetTilesArray())
+        foreach (HexTile tile in grid.tilesArray)
         {
             HexCoordinates coordinates = tile.coordinates;
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
@@ -381,7 +380,7 @@ public class MapGeneration
     // the pathfinding for rivers is probably quite naive, should try and implement something else
     public List<List<HexTile>> GenerateRivers(float minAltitude = 0.65f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
     {
-        List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.altitude >= minAltitude
+        List<HexTile> riverSourceCandidates = grid.tilesArray.Where(t => t.altitude >= minAltitude
                                                 && t.temperature >= minPrecipitation
                                                 && t.precipitation >= minTemperature)
                                             .ToList();
@@ -664,7 +663,7 @@ public class MapGeneration
         }
 
         // assign terrain to non-oceanic water tiles
-        foreach (HexTile tile in grid.GetTilesArray())
+        foreach (HexTile tile in grid.tilesArray)
         {
             if (tile.altitude <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
             {
@@ -679,7 +678,7 @@ public class MapGeneration
     // this should obviously only be run after checking which tiles are oceanic
     private void CalculateOceanDistances()
     {
-        foreach (HexTile tile in grid.GetTilesArray())
+        foreach (HexTile tile in grid.tilesArray)
         {
             int distanceFromNearestOcean = 0;
             if (tile.terrain != TerrainTypes.ocean)
@@ -734,7 +733,7 @@ public class MapGeneration
         foreach (KeyValuePair<(int, int, int), float> entry in noiseMap)
         {
             (int, int, int) key = entry.Key;
-            HexTile tile = grid.GetTiles()[key];
+            HexTile tile = grid.tiles[key];
             if (entry.Value == 0f) { tilesWith0Value++; }
 
             int neighborBoundaryTiles = 0;
@@ -794,7 +793,7 @@ public class MapGeneration
 
     public void AssignTerrains()
     {
-        Dictionary<(int, int, int), HexTile> tiles = grid.GetTiles();
+        Dictionary<(int, int, int), HexTile> tiles = grid.tiles;
 
         foreach (HexTile tile in tiles.Values)
         {
