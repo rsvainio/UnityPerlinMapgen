@@ -95,13 +95,13 @@ public class HexGridInspector : Editor
 
                 foreach (HexTile tile in grid.GetTilesArray())
                 {
-                    //(int, int, int) coordinates = tile.GetCoordinates().ToTuple();
+                    //(int, int, int) coordinates = tile.coordinates.ToTuple();
 
                     float precipitation, temperature, altitude;
                     precipitation = temperature = altitude = 0f;
-                    if (generatePrecipitationMap) { precipitation = tile.GetPrecipitation(); }
-                    if (generateAltitudeMap) { altitude = tile.GetAltitude(); }
-                    if (generateTemperatureMap) { temperature = tile.GetTemperature(); }
+                    if (generatePrecipitationMap) { precipitation = tile.precipitation; }
+                    if (generateAltitudeMap) { altitude = tile.altitude; }
+                    if (generateTemperatureMap) { temperature = tile.temperature; }
 
                     Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
                     if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
@@ -113,7 +113,7 @@ public class HexGridInspector : Editor
                     Color precipitationColor = new Color(0f, 0f, 0f);
                     if (generateAltitudeMap)
                     {
-                        TerrainType terrain = tile.GetTerrain();
+                        TerrainType terrain = tile.terrain;
                         if (altitude <= grid.waterLevel || terrain == TerrainTypes.freshWater || terrain == TerrainTypes.ocean)
                         {
                             altitudeColor = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
@@ -177,7 +177,7 @@ public class HexGridInspector : Editor
                 //Vector3 windDirection = HexMetrics.ConvertDegreesToVector(90);
                 //Debug.Log($"Wind direction: {windDirection.ToString()}");
                 //List<HexTile> sortedTiles = grid.GetTilesArray()
-                //.OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection))
+                //.OrderBy(t => Vector3.Dot(t.coordinates.ToVec3(), windDirection))
                 //.ToList();
 
                 //int n = 0;
@@ -198,15 +198,15 @@ public class HexGridInspector : Editor
                 Dictionary<(int, int, int), float> altitudeMap = new();
                 foreach (HexTile tile in grid.GetTilesArray())
                 {
-                    altitudeMap.Add(tile.GetCoordinates().ToTuple(), tile.GetAltitude());
+                    altitudeMap.Add(tile.coordinates.ToTuple(), tile.altitude);
                 }
                 altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
 
                 foreach (HexTile tile in grid.GetTilesArray())
                 {
-                    (int, int, int) coordinates = tile.GetCoordinates().ToTuple();
+                    (int, int, int) coordinates = tile.coordinates.ToTuple();
                     float altitude = altitudeMap[coordinates];
-                    tile.SetAltitude(altitude);
+                    tile.altitude = altitude;
                     if (altitude <= grid.waterLevel) // water level, might need tweaking
                     {
                         Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
@@ -271,10 +271,10 @@ public class HexGridInspector : Editor
 
                     foreach (HexTile tile in tiles)
                     {
-                        (int, int, int) key = tile.GetCoordinates().ToTuple();
-                        float altitude = tile.GetAltitude();
+                        (int, int, int) key = tile.coordinates.ToTuple();
+                        float altitude = tile.altitude;
                         altitude = Mathf.Max(altitude, mountainMask[key]);
-                        tile.SetAltitude(altitude);
+                        tile.altitude = altitude;
 
                         if (singleColor)
                         {
@@ -317,7 +317,7 @@ public class HexGridInspector : Editor
 
                 foreach (HexTile tile in tiles)
                 {
-                    tile.SetAltitude(0f);
+                    tile.altitude = 0f;
                 }
             }
 

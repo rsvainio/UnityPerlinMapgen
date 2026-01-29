@@ -1,9 +1,11 @@
 using System;
 using UnityEngine;
 
-public struct HexCoordinates
+public readonly struct HexCoordinates
 {
-    public readonly int q, r, s;
+    public readonly int q { get; }
+    public readonly int r { get; }
+    public readonly int s { get; }
 
     public HexCoordinates(int q, int r, int s)
     {
@@ -26,6 +28,7 @@ public struct HexCoordinates
         this.q = coordinates.Item1;
         this.r = coordinates.Item2;
         this.s = coordinates.Item3;
+        Debug.Assert(q + r + s == 0, $"Tried to create a HexCoordinates object with coordinates {q},{r},{s}");
     }
 
     public HexCoordinates (Vector3 position)
@@ -45,19 +48,19 @@ public struct HexCoordinates
         return new HexCoordinates(q, r, s);
     }
 
-    public static HexCoordinates HexAdd(HexCoordinates a, HexCoordinates b)
-    {
-        int q = a.q + b.q;
-        int r = a.r + b.r;
-        int s = a.s + b.s;
-        return new HexCoordinates(q, r, s);
-    }
-
     public HexCoordinates HexSubtract(HexCoordinates coordinates)
     {
         int q = this.q - coordinates.q;
         int r = this.r - coordinates.r;
         int s = this.s - coordinates.s;
+        return new HexCoordinates(q, r, s);
+    }
+
+    public static HexCoordinates HexAdd(HexCoordinates a, HexCoordinates b)
+    {
+        int q = a.q + b.q;
+        int r = a.r + b.r;
+        int s = a.s + b.s;
         return new HexCoordinates(q, r, s);
     }
 
@@ -71,7 +74,7 @@ public struct HexCoordinates
 
     public static int HexDistance(HexTile a, HexTile b)
     {
-        return HexDistance(a.GetCoordinates(), b.GetCoordinates());
+        return HexDistance(a.coordinates, b.coordinates);
     }
 
     public static int HexDistance(HexCoordinates a, HexCoordinates b)

@@ -19,11 +19,6 @@ public class HexGrid : MonoBehaviour
     public List<List<HexTile>> rivers = new List<List<HexTile>>();
     public float waterLevel = 0.175f; // this will probably be moved elsewhere later
 
-    public void Awake()
-    {
-        TerrainDatabase.LoadTerrains();
-    }
-
     public void Initialize()
     {
         if (hexMesh == null) { GenerateHexMesh(); }
@@ -88,7 +83,7 @@ public class HexGrid : MonoBehaviour
     private void ChangeClusterColor(HexTile tile)
     {
         ChangeColor(tile);
-        foreach (HexTile neighborTile in tile.GetNeighbors())
+        foreach (HexTile neighborTile in tile.neighbors)
         {
             ChangeColor(neighborTile);
         }
@@ -100,7 +95,7 @@ public class HexGrid : MonoBehaviour
         tile.GetComponentInChildren<MeshRenderer>().material.color = touchedColor;
         //tile.GetComponentInChildren<MeshFilter>().mesh = GenerateHexMesh(touchedColor);
 
-        Debug.Log("changed color of hex at " + tile.GetCoordinates().ToString());
+        Debug.Log("changed color of hex at " + tile.coordinates.ToString());
     }
 
     //not used but works as a reference on how to implement functionality to tiles
@@ -212,7 +207,7 @@ public class HexGrid : MonoBehaviour
     {
         foreach (HexTile tile in GetTilesArray())
         {
-            if (tile.GetNeighbors().Length != 6) // add this tile to the list of map border tiles if it has fewer than 6 neighbors
+            if (tile.neighbors.Length != 6) // add this tile to the list of map border tiles if it has fewer than 6 neighbors
             {
                 borderTiles.Add(tile);
             }

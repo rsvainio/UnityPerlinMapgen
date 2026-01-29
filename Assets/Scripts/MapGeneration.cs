@@ -4,6 +4,7 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 using Vector3 = UnityEngine.Vector3;
 using Terrain;
+using UnityEngine.Tilemaps;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -39,7 +40,7 @@ public class MapGeneration
         // assign precipitation values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in precipitationMap)
         {
-            grid.GetTiles()[entry.Key].SetPrecipitation(entry.Value);
+            grid.GetTiles()[entry.Key].precipitation = entry.Value;
         }
 
         return precipitationMap;
@@ -49,14 +50,14 @@ public class MapGeneration
             Vector3 windDirection = HexMetrics.ConvertDegreesToVector(Random.Range(0, 360));
             Debug.Log($"Wind direction: {windDirection.ToString()}");
             List<HexTile> sortedTiles = grid.GetTilesArray()
-                .OrderBy(t => Vector3.Dot(t.GetCoordinates().ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
+                .OrderBy(t => Vector3.Dot(t.coordinates.ToVec3(), windDirection)) // sort tiles so that "upwind" tiles are first
                 .ToList();
 
             // set initial cloud cover values for each tile before simulating the effect of rain shadow
             Dictionary<(int, int, int), float> cloudCoverMap = new Dictionary<(int, int, int), float>();
             foreach (HexTile tile in sortedTiles)
             {
-                (int, int, int) key = tile.GetCoordinates().ToTuple();
+                (int, int, int) key = tile.coordinates.ToTuple();
                 float startingCloudCover = 0;
                 if (tile.terrain == TerrainTypes.ocean)
                 {
@@ -80,15 +81,15 @@ public class MapGeneration
             Dictionary<(int, int, int), float> rainShadowMap = new Dictionary<(int, int, int), float>();
             foreach (HexTile tile in sortedTiles)
             {
-                (int, int, int) key = tile.GetCoordinates().ToTuple();
-                float tileMaxCloudCover = 1f - tile.GetAltitude();
+                (int, int, int) key = tile.coordinates.ToTuple();
+                float tileMaxCloudCover = 1f - tile.altitude;
                 float tileCloudCover = Mathf.Min(cloudCoverMap[key], tileMaxCloudCover);
                 rainShadowMap[key] = Mathf.Clamp01(tileCloudCover);
 
                 (int, int, int) neighborKey = tile.GetCoordinatesInDirection(windDirection).ToTuple();
                 if (grid.GetTiles().TryGetValue(neighborKey, out HexTile downwindTile))
                 {
-                    float altitudeFactor = 1f - Mathf.Pow(tile.GetAltitude(), 1.5f);
+                    float altitudeFactor = 1f - Mathf.Pow(tile.altitude, 1.5f);
                     cloudCoverMap[neighborKey] += tileCloudCover * altitudeFactor;
                 }
             }
@@ -97,13 +98,13 @@ public class MapGeneration
             Dictionary<(int, int, int), float> averagedRainShadowMap = new Dictionary<(int, int, int), float>();
             foreach (HexTile tile in sortedTiles)
             {
-                (int, int, int) key = tile.GetCoordinates().ToTuple();
+                (int, int, int) key = tile.coordinates.ToTuple();
                 float precipitationSum = rainShadowMap[key];
-                foreach (HexTile neighbor in tile.GetNeighbors())
+                foreach (HexTile neighbor in tile.neighbors)
                 {
-                    precipitationSum += rainShadowMap[neighbor.GetCoordinates().ToTuple()];
+                    precipitationSum += rainShadowMap[neighbor.coordinates.ToTuple()];
                 }
-                averagedRainShadowMap[key] = precipitationSum / (tile.GetNeighbors().Length + 1);
+                averagedRainShadowMap[key] = precipitationSum / (tile.neighbors.Length + 1);
             }
 
             precipitationMap = averagedRainShadowMap;
@@ -139,7 +140,7 @@ public class MapGeneration
         // assign altitude values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in altitudeMap)
         {
-            grid.GetTiles()[entry.Key].SetAltitude(entry.Value);
+            grid.GetTiles()[entry.Key].altitude = entry.Value;
         }
 
         CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
@@ -220,7 +221,7 @@ public class MapGeneration
         // assign temperature values to tiles here before returning the altitude map
         foreach (KeyValuePair<(int, int, int), float> entry in temperatureMap)
         {
-            grid.GetTiles()[entry.Key].SetTemperature(entry.Value);
+            grid.GetTiles()[entry.Key].temperature = entry.Value;
         }
 
         return temperatureMap;
@@ -296,7 +297,7 @@ public class MapGeneration
 
         foreach (HexTile tile in grid.GetTilesArray())
         {
-            HexCoordinates coordinates = tile.GetCoordinates();
+            HexCoordinates coordinates = tile.coordinates;
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
             float rn = (coordinates.r + coordinateOffset) / (float)grid.height * scale;
             float sample = 0f;
@@ -339,7 +340,7 @@ public class MapGeneration
 
         foreach (HexTile tile in grid.GetTilesArray())
         {
-            HexCoordinates coordinates = tile.GetCoordinates();
+            HexCoordinates coordinates = tile.coordinates;
             float qn = (coordinates.q + coordinateOffset) / (float)grid.width * scale;
             float rn = (coordinates.r + coordinateOffset) / (float)grid.height * scale;
             float sample = 0f;
@@ -380,11 +381,11 @@ public class MapGeneration
     // the pathfinding for rivers is probably quite naive, should try and implement something else
     public List<List<HexTile>> GenerateRivers(float minAltitude = 0.65f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
     {
-        List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.GetAltitude() >= minAltitude
-                                                && t.GetTemperature() >= minPrecipitation
-                                                && t.GetPrecipitation() >= minTemperature)
+        List<HexTile> riverSourceCandidates = grid.GetTilesArray().Where(t => t.altitude >= minAltitude
+                                                && t.temperature >= minPrecipitation
+                                                && t.precipitation >= minTemperature)
                                             .ToList();
-        riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.GetAltitude()).ToList(); // sort the list of candidates by altitude
+        riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.altitude).ToList(); // sort the list of candidates by altitude
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
 
@@ -392,7 +393,7 @@ public class MapGeneration
         foreach (HexTile tile in riverSourceCandidates)
         {
             //add checks here to make sure the tile is still a valid candidate
-            float weight = tile.GetPrecipitation() * tile.GetAltitude();
+            float weight = tile.precipitation * tile.altitude;
             if (Random.value < weight)
             {
                 List<HexTile> newRiver = DoRiverRecursion(tile, Random.Range(riverAvgLength - 3, riverAvgLength + 3));
@@ -401,14 +402,14 @@ public class MapGeneration
                     rivers.Add(newRiver);
                     foreach (HexTile riverTile in newRiver)
                     {
-                        riverTile.SetHasRiver(true);
+                        riverTile.hasRiver = true;
                     }
                 }
                 else
                 {
                     foreach (HexTile riverTile in newRiver)
                     {
-                        riverTile.SetHasRiver(false);
+                        riverTile.hasRiver = false;
                     }
                     newRiver.Clear();
                 }
@@ -434,9 +435,9 @@ public class MapGeneration
                 {
                     if (!riverTiles.Contains(searchTile))
                     {
-                        if (searchTile.HasRiver() || searchTile.GetTerrain() == TerrainTypes.ocean || searchTile.GetTerrain() == TerrainTypes.freshWater)
+                        if (searchTile.hasRiver || searchTile.terrain == TerrainTypes.ocean || searchTile.terrain == TerrainTypes.freshWater)
                         {
-                            int newDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), searchTile.GetCoordinates());
+                            int newDistance = HexCoordinates.HexDistance(tile.coordinates, searchTile.coordinates);
                             if (newDistance < oldDistance || oldDistance == 0)
                             {
                                 oldDistance = newDistance;
@@ -447,16 +448,16 @@ public class MapGeneration
                 }
             }
 
-            float lowestEffectiveAltitude = tile.GetAltitude();
-            foreach (HexTile neighbor in tile.GetNeighbors())
+            float lowestEffectiveAltitude = tile.altitude;
+            foreach (HexTile neighbor in tile.neighbors)
             {
-                if (neighbor.GetTerrain() == TerrainTypes.ocean || neighbor.GetTerrain() == TerrainTypes.freshWater) // the neighbouring tile is a water tile so the river terminates
+                if (neighbor.terrain == TerrainTypes.ocean || neighbor.terrain == TerrainTypes.freshWater) // the neighbouring tile is a water tile so the river terminates
                 {
                     return riverTiles;
                 }
                 else if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
                 {
-                    if (neighbor.HasRiver()) // two rivers have met and should combine here
+                    if (neighbor.hasRiver) // two rivers have met and should combine here
                     {
                         return riverTiles;
                     }
@@ -464,7 +465,7 @@ public class MapGeneration
                     {
                         // check that the tile 'neighbor' has no surrounding tiles that are part of this river other than 'tile'
                         bool neighborIsValid = true;
-                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
+                        foreach (HexTile neighborsNeighbor in neighbor.neighbors)
                         {
                             if (!neighborIsValid)
                             {
@@ -480,13 +481,13 @@ public class MapGeneration
                         float alignment = 0f;
                         if (biasTile != null)
                         {
-                            HexCoordinates toNeighbor = neighbor.GetCoordinates().HexSubtract(tile.GetCoordinates());
-                            HexCoordinates toDestination = biasTile.GetCoordinates().HexSubtract(tile.GetCoordinates());
+                            HexCoordinates toNeighbor = neighbor.coordinates.HexSubtract(tile.coordinates);
+                            HexCoordinates toDestination = biasTile.coordinates.HexSubtract(tile.coordinates);
                             alignment = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
                             alignment = Mathf.Clamp01((alignment + 1f) * 0.5f);
                         }
                         
-                        float effectiveAltitude = neighbor.GetAltitude() - alignment * 0.15f;
+                        float effectiveAltitude = neighbor.altitude - alignment * 0.15f;
                         effectiveAltitude += Random.Range(-0.02f, 0.02f);
                         if (effectiveAltitude < lowestEffectiveAltitude || (riverTiles.Count < riverMinimumLength && nextTile == null))
                         {
@@ -533,9 +534,9 @@ public class MapGeneration
             for (int i = river.Count - 1; i > river.Count - tilesToIterate; i--)
             {
                 HexTile curRiverTile = river[i];
-                foreach (HexTile neighbor in curRiverTile.GetNeighbors())
+                foreach (HexTile neighbor in curRiverTile.neighbors)
                 {
-                    float neighborAltitude = neighbor.GetAltitude();
+                    float neighborAltitude = neighbor.altitude;
                     if (neighborAltitude < lowestAltitude && !river.Contains(neighbor))
                     {
                         lowestAltitude = neighborAltitude;
@@ -553,7 +554,7 @@ public class MapGeneration
             List<HexTile> lakeNeighbors = new List<HexTile>();
             TerrainType newLakeTerrain = TerrainTypes.freshWater;
             lake.Add(lakeStartCandidate);
-            foreach (HexTile neighbor in lakeStartCandidate.GetNeighbors()) { lakeNeighbors.Add(neighbor); }
+            foreach (HexTile neighbor in lakeStartCandidate.neighbors) { lakeNeighbors.Add(neighbor); }
 
             while (Random.value <= 1f - ((lake.Count - 1) * 0.025f)) // after the first tile every subsequent tile imposes an additional chance of stopping lake generation
             {
@@ -562,8 +563,8 @@ public class MapGeneration
                 for (int i = lakeNeighbors.Count - 1; i >= 0; i--)
                 {
                     HexTile neighbor = lakeNeighbors[i];
-                    TerrainType terrain = neighbor.GetTerrain();
-                    float neighborAltitude = neighbor.GetAltitude();
+                    TerrainType terrain = neighbor.terrain;
+                    float neighborAltitude = neighbor.altitude;
                     // encountering either another lake or an ocean will result in the current lake being terminated,
                     // but it'll likely create a noticeable artefact where the two bodies of water connect with only 1 tile
                     if (terrain == TerrainTypes.ocean || terrain == TerrainTypes.freshWater)
@@ -572,7 +573,7 @@ public class MapGeneration
                         newLakeTerrain = terrain;
                         nextLakeTile = null;
 
-                        foreach (HexTile tile in neighbor.GetNeighbors().Where(x => x.terrain != TerrainTypes.ocean || x.terrain != TerrainTypes.freshWater))
+                        foreach (HexTile tile in neighbor.neighbors.Where(x => x.terrain != TerrainTypes.ocean || x.terrain != TerrainTypes.freshWater))
                         {
                             if (!lake.Contains(tile))
                             {
@@ -584,7 +585,7 @@ public class MapGeneration
                     {
                         // add a bias to this tile based on its number of neighbouring tiles that are already part of the lake
                         int neighboringLakeTiles = 0;
-                        foreach (HexTile neighborsNeighbor in neighbor.GetNeighbors())
+                        foreach (HexTile neighborsNeighbor in neighbor.neighbors)
                         {
                             if (lake.Contains(neighborsNeighbor))
                             {
@@ -604,7 +605,7 @@ public class MapGeneration
 
                 lake.Add(nextLakeTile);
                 lakeNeighbors.Remove(nextLakeTile);
-                foreach (HexTile neighbor in nextLakeTile.GetNeighbors())
+                foreach (HexTile neighbor in nextLakeTile.neighbors)
                 {
                     if (!lake.Contains(neighbor) && !lakeNeighbors.Contains(neighbor))
                     {
@@ -617,17 +618,17 @@ public class MapGeneration
             // alternatively the water level could be ignored, as lakes shouldn't need to be below it
             foreach (HexTile lakeTile in lake)
             {
-                lakeTile.SetTerrain(newLakeTerrain);
+                lakeTile.terrain = newLakeTerrain;
                 river.Remove(lakeTile);
 
-                HexTile[] neighbors = lakeTile.GetNeighbors();
-                float altitude = lakeTile.GetAltitude();
+                HexTile[] neighbors = lakeTile.neighbors;
+                float altitude = lakeTile.altitude;
                 foreach (HexTile neighbor in neighbors)
                 {
-                    altitude += neighbor.GetAltitude();
+                    altitude += neighbor.altitude;
                 }
                 altitude /= neighbors.Length + 1;
-                lakeTile.SetAltitude(Mathf.Min(altitude, grid.waterLevel * Random.Range(0.85f, 0.95f)));
+                lakeTile.altitude = Mathf.Min(altitude, grid.waterLevel * Random.Range(0.85f, 0.95f));
             }
 
             Debug.Log($"Created a lake of size {lake.Count}", lake[0]);
@@ -647,10 +648,10 @@ public class MapGeneration
 
         void DoOceanMappingRecursion(HexTile tile)
         {
-            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
+            if (tile.altitude <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
             {
-                tile.SetTerrain(TerrainTypes.ocean);
-                foreach (HexTile neighborTile in tile.GetNeighbors())
+                tile.terrain = TerrainTypes.ocean;
+                foreach (HexTile neighborTile in tile.neighbors)
                 {
                     DoOceanMappingRecursion(neighborTile);
                 }
@@ -665,9 +666,9 @@ public class MapGeneration
         // assign terrain to non-oceanic water tiles
         foreach (HexTile tile in grid.GetTilesArray())
         {
-            if (tile.GetAltitude() <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
+            if (tile.altitude <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
             {
-                tile.SetTerrain(TerrainTypes.freshWater);
+                tile.terrain = TerrainTypes.freshWater;
             }
         }
 
@@ -687,10 +688,10 @@ public class MapGeneration
                 Queue<HexTile> tileQueue = new Queue<HexTile>();
                 Dictionary<(int, int, int), bool> exploredTiles = new Dictionary<(int, int, int), bool>();
 
-                foreach (HexTile neighborTile in tile.GetNeighbors())
+                foreach (HexTile neighborTile in tile.neighbors)
                 {
                     tileQueue.Enqueue(neighborTile);
-                    exploredTiles[neighborTile.GetCoordinates().ToTuple()] = true;
+                    exploredTiles[neighborTile.coordinates.ToTuple()] = true;
                 }
 
                 while (tileQueue.Count > 0)
@@ -698,8 +699,8 @@ public class MapGeneration
                     HexTile neighborTile = tileQueue.Dequeue();
                     if (neighborTile.terrain == TerrainTypes.ocean)
                     {
-                        distanceFromNearestOcean = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
-                        //float tileDistance = HexCoordinates.HexDistance(tile.GetCoordinates(), neighborTile.GetCoordinates());
+                        distanceFromNearestOcean = HexCoordinates.HexDistance(tile.coordinates, neighborTile.coordinates);
+                        //float tileDistance = HexCoordinates.HexDistance(tile.coordinates, neighborTile.coordinates);
                         //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
                         //distanceFromNearestOcean = tileDistance / maxDistance;
 
@@ -707,9 +708,9 @@ public class MapGeneration
                     }
                     else
                     {
-                        foreach (HexTile tileToExplore in neighborTile.GetNeighbors())
+                        foreach (HexTile tileToExplore in neighborTile.neighbors)
                         {
-                            (int, int, int) coordinateTuple = tileToExplore.GetCoordinates().ToTuple();
+                            (int, int, int) coordinateTuple = tileToExplore.coordinates.ToTuple();
                             bool explored = exploredTiles.TryGetValue(coordinateTuple, out bool value);
                             if (explored) { continue; }
 
@@ -720,7 +721,7 @@ public class MapGeneration
                 }
             }
 
-            oceanDistanceMap[tile.GetCoordinates().ToTuple()] = distanceFromNearestOcean;
+            oceanDistanceMap[tile.coordinates.ToTuple()] = distanceFromNearestOcean;
         }
     }
 
@@ -738,12 +739,12 @@ public class MapGeneration
 
             int neighborBoundaryTiles = 0;
             float tileNewValue = 0f; // the new value to which the tile will be set to if transitioned
-            HexTile[] neighborTiles = tile.GetNeighbors();
+            HexTile[] neighborTiles = tile.neighbors;
             if (noiseMap[key] > boundary)
             {
                 foreach (HexTile neighborTile in neighborTiles)
                 {
-                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    float value = noiseMap[neighborTile.coordinates.ToTuple()];
                     if (value <= boundary)
                     {
                         neighborBoundaryTiles++;
@@ -755,7 +756,7 @@ public class MapGeneration
             {
                 foreach (HexTile neighborTile in neighborTiles)
                 {
-                    float value = noiseMap[neighborTile.GetCoordinates().ToTuple()];
+                    float value = noiseMap[neighborTile.coordinates.ToTuple()];
                     if (value > boundary)
                     {
                         neighborBoundaryTiles++;
@@ -791,98 +792,17 @@ public class MapGeneration
         }
     }
 
-    // this will need to be rewritten
     public void AssignTerrains()
     {
-        /*
-        if (grid.terrainList == null)
-        {
-            //grid.ReadTerrainTypes();
-        }
+        Dictionary<(int, int, int), HexTile> tiles = grid.GetTiles();
 
-        foreach (HexTile tile in grid.tiles.Values)
+        foreach (HexTile tile in tiles.Values)
         {
-            float precipitation = tile.GetPrecipitation();
-            float altitude = tile.GetAltitude();
-            float temperature = tile.GetTemperature();
+            float altitude = tile.altitude;
+            float temperature = tile.temperature;
+            float precipitation = tile.precipitation;
 
-            if (altitude < 0.2f)
-            {
-                tile.SetTerrain(DefaultTerrains.water);
-            }
-            else if (altitude < 0.8f) // revisit this number
-            {
-                if (temperature > 0.8f)
-                {
-                    if (precipitation > 0.63f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.tropicalRainforest);
-                    }
-                    else if (precipitation > 0.188f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.savanna);
-                    }
-                    else
-                    {
-                        tile.SetTerrain(DefaultTerrains.desert);
-                    }
-                }
-                else if (temperature > 0.56f)
-                {
-                    if (precipitation > 0.8f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.error);
-                    }
-                    else if (precipitation > 0.5f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.temperateRainforest);
-                    }
-                    else if (precipitation > 0.25f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.temperateForest);
-                    }
-                    else if (precipitation > 0.125f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.woodland);
-                    }
-                    else
-                    {
-                        tile.SetTerrain(DefaultTerrains.grassland);
-                    }
-                }
-                else if (temperature > 0.4f)
-                {
-                    if (precipitation > 0.5f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.error);
-                    }
-                    else if (precipitation > 0.125f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.borealForest);
-                    }
-                    else if (precipitation > 0.05f)
-                    {
-                        tile.SetTerrain(DefaultTerrains.woodland);
-                    }
-                    else
-                    {
-                        tile.SetTerrain(DefaultTerrains.grassland);
-                    }
-                }
-                else if (temperature > 0.24f)
-                {
-                    tile.SetTerrain(DefaultTerrains.tundra);
-                }
-                else
-                {
-                    tile.SetTerrain(DefaultTerrains.arctic);
-                }
-            }
-            else
-            {
-                tile.SetTerrain(DefaultTerrains.mountain);
-            }
+
         }
-    */
     }
 }

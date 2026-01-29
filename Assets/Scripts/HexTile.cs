@@ -3,100 +3,63 @@ using System.Collections.Generic;
 using UnityEngine;
 using Terrain;
 
+// TODO: rewrite all the fields to be properties where reasonable
 public class HexTile : MonoBehaviour
 {
-    private HexCoordinates coordinates;
-    private HexGrid grid;
-    public string stringcoords;
-    private HexTile[] neighbors;
+    public HexCoordinates coordinates { get; private set; }
+    public string stringcoords { get; private set; }
+    public float altitude { get; set; }
+    public float temperature { get; set; }
+    public float precipitation { get; set; }
+    public TerrainType terrain { get; set; }
+    public bool hasRiver { get; set; } = false;
+    public HexTile[] neighbors
+    {
+        get { return _neighbors ?? GetNeighbors(); }
+    }
 
-    public TerrainType terrain;
-    [SerializeField] private float precipitation, altitude, temperature;
-    private bool hasRiver = false;
+    private HexGrid _grid;
+    private HexTile[] _neighbors;
 
     public void Initialize(int q, int r, int s, TerrainType terrain, HexGrid grid)
     {
         this.coordinates = new HexCoordinates(q, r, s);
         this.stringcoords = $"{q}, {r}, {s}";
-        this.neighbors = null;
         this.terrain = terrain;
-        this.grid = grid;
+        this._neighbors = null;
+        this._grid = grid;
     }
 
     // resets the iteration-specific attributes of the tile
     public void ResetTile()
     {
-        SetBiomeAttributes(0f, 0f, 0f);
-        SetTerrain(null);
+        altitude = temperature = precipitation = 0f;
+        terrain = null;
         hasRiver = false;
     }
 
-    public HexCoordinates GetCoordinates()
-    {
-        return coordinates;
-    }
-
-    //public float GetPrecipitation() { return precipitation; }
-    //public void SetPrecipitation(float precipitation) { SetBiomeAttributes(precipitation, this.altitude, this.temperature); }
-    //public float GetAltitude() { return altitude; }
-    //public void SetAltitude(float altitude) { SetBiomeAttributes(this.precipitation, altitude, this.temperature); }
-    //public float GetTemperature() { return temperature; }
-    //public void SetTemperature(float temperature) { SetBiomeAttributes(this.precipitation, this.altitude, temperature); } 
-    //public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
-    //{
-    //    Debug.Assert(!float.IsNaN(precipitation) && !float.IsNaN(altitude) && !float.IsNaN(temperature), 
-    //        $"Attempted to set a NaN biome attribute, precipitation: {precipitation}, altitude: {altitude}, temperature: {temperature}", this);
-    //    this.precipitation = precipitation;
-    //    this.altitude = altitude;
-    //    this.temperature = temperature;
-    //}
-    public float GetPrecipitation() { return precipitation; }
-    public void SetPrecipitation(float precipitation) { this.precipitation = precipitation; }
-    public float GetAltitude() { return altitude; }
-    public void SetAltitude(float altitude) { this.altitude = altitude; }
-    public float GetTemperature() { return temperature; }
-    public void SetTemperature(float temperature) { this.temperature = temperature; }
-    public void SetBiomeAttributes(float precipitation, float altitude, float temperature)
-    {
-        this.precipitation = precipitation;
-        this.altitude = altitude;
-        this.temperature = temperature;
-    }
-    public bool HasRiver() { return hasRiver;  }
-    public void SetHasRiver(bool hasRiver) { this.hasRiver = hasRiver; }
-    public TerrainType GetTerrain() { return terrain; }
-    public void SetTerrain(TerrainType terrain)
-    {
-        this.terrain = terrain;
-        //GetComponentInChildren<MeshRenderer>().material.color = terrain.baseColor;
-    }
-
     // returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null at call time
-    public HexTile[] GetNeighbors()
+    private HexTile[] GetNeighbors()
     {
-        if (neighbors == null)
+        HexCoordinates[] neighborCoordinates = GetNeighborCoordinates();
+        Dictionary<(int, int, int), HexTile> _gridTiles = _grid.GetTiles();
+        _neighbors = new HexTile[neighborCoordinates.Length];
+        int j = 0;
+
+        for (int i = 0; i < _neighbors.Length; i++)
         {
-            HexCoordinates[] neighborCoordinates = GetNeighborCoordinates();
-            Dictionary<(int, int, int), HexTile> gridTiles = grid.GetTiles();
-            neighbors = new HexTile[neighborCoordinates.Length];
-            int j = 0;
-
-            for (int i = 0; i < neighbors.Length; i++)
+            if (_gridTiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
             {
-                if (gridTiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
-                {
-                    neighbors[i - j] = tile;
-                }
-                else
-                {
-                    j++;
-                }
+                _neighbors[i - j] = tile;
             }
-
-            Array.Resize(ref neighbors, neighbors.Length - j);
+            else
+            {
+                j++;
+            }
         }
 
-        return neighbors;
+        Array.Resize(ref _neighbors, _neighbors.Length - j);
+        return _neighbors;
     }
 
     public HexCoordinates GetCoordinatesInDirection(Vector3 vector)
@@ -126,7 +89,7 @@ public class HexTile : MonoBehaviour
             for (int r = Mathf.Max(-range, -q - range); r <= Mathf.Min(range, -q + range); r++)
             {
                 int s = -q - r;
-                if (grid.GetTiles().TryGetValue((q, r, s), out HexTile tile))
+                if (_grid.GetTiles().TryGetValue((q, r, s), out HexTile tile))
                 {
                     results.Add(tile);
                 }
@@ -142,7 +105,7 @@ public class HexTile : MonoBehaviour
     {
         HexCoordinates[] neighborCoordinates;
 
-        if (neighbors == null)
+        if (_neighbors == null)
         {
             HexCoordinates[] vectors = HexMetrics.neighborVectors;
             neighborCoordinates = new HexCoordinates[vectors.Length];
@@ -154,14 +117,28 @@ public class HexTile : MonoBehaviour
         }
         else
         {
-            neighborCoordinates = new HexCoordinates[neighbors.Length];
+            neighborCoordinates = new HexCoordinates[_neighbors.Length];
 
-            for (int i = 0; i < neighbors.Length; i++)
+            for (int i = 0; i < _neighbors.Length; i++)
             {
-                neighborCoordinates[i] = neighbors[i].GetCoordinates();
+                neighborCoordinates[i] = _neighbors[i].coordinates;
             }
         }
 
         return neighborCoordinates;
     }
+}
+
+public struct TileAttributes
+{
+    public TileAttributes(float altitude, float temperature, float precipitation)
+    {
+        this.altitude = altitude;
+        this.temperature = temperature;
+        this.precipitation = precipitation;
+    }
+
+    public float altitude { get; set; }
+    public float temperature { get; set; }
+    public float precipitation { get; set; }
 }
