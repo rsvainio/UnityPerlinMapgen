@@ -12,7 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
   m_Name: freshWater
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: ocean
-  displayName: Ocean
-  baseColor: {r: 0.12001601, g: 0.14704813, b: 0.8207547, a: 0}
+  id: freshWater
+  displayName: Fresh water
+  baseColor: {r: 0.1215686, g: 0.5360602, b: 0.81960785, a: 0}
   baseMovementCost: 1
+  rules:
+  - ruleLogic: {fileID: 11400000, guid: 310ab298ee6665b4eae48891103affbc, type: 2}
+    parameters:
+      min: 0
+      max: 0.1

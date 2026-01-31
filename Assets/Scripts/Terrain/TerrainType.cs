@@ -9,15 +9,22 @@ namespace Terrain
         public string id;
         public string displayName;
         public Color baseColor;
+
         [Header("Gameplay")]
         public float baseMovementCost;
         //public bool isWalkable;
 
-        public TerrainType(string displayName, float baseMovementCost, Color baseColor)
+        [Header("Rules")]
+        public TerrainRuleInstance[] rules;
+
+        public bool MatchesRules(HexTile tile)
         {
-            this.displayName = displayName;
-            this.baseMovementCost = baseMovementCost;
-            this.baseColor = baseColor;
+            foreach (TerrainRuleInstance rule in rules)
+            {
+                if (!rule.ruleLogic.MatchesRules(tile, rule.parameters)) { return false; }
+            }
+
+            return true;
         }
     }
 }
