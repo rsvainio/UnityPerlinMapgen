@@ -9,11 +9,9 @@ namespace Terrain
         public string id;
         public string displayName;
         public Color baseColor;
-
         [Header("Gameplay")]
         public float baseMovementCost;
         //public bool isWalkable;
-
         [Header("Rules")]
         public TerrainRuleInstance[] rules;
 

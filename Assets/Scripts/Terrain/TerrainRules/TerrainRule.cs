@@ -4,7 +4,7 @@ using UnityEngine;
 // a rule like "above sea level" would never need its value changed and so wouldn't require a TerrainRuleParameters object
 public abstract class TerrainRule : ScriptableObject
 {
-    public abstract bool MatchesRules(HexTile tile, TerrainRuleParameters parameters);
+    public abstract bool MatchesRules(HexTile tile, TerrainRuleParameters parameters = null);
 }
 
 [System.Serializable]
