@@ -11,6 +11,34 @@ namespace Terrain
         public static TerrainType GetTerrainType(string id) => terrainTypes[id];
         public static TerrainFeature GetTerrainFeature(string id) => terrainFeatures[id];
 
+        public static TerrainType GetMatchingTerrain(HexTile tile)
+        {
+            TerrainType returnTerrain = null;
+            foreach (TerrainType terrain in terrainTypes.Values)
+            {
+                if (returnTerrain != null && (returnTerrain.priority > terrain.priority))
+                {
+                    break;
+                }
+                if (terrain.MatchesRules(tile))
+                {
+                    returnTerrain = returnTerrain != null ? returnTerrain : terrain;
+
+                    if (terrain.priority < returnTerrain.priority)
+                    {
+                        returnTerrain = terrain;
+                    }
+                    else if (returnTerrain.priority == terrain.priority)
+                    {
+                        Debug.LogWarning($"Tile meets conditions for two terrains of equal priority: {returnTerrain.id}, {terrain.id}", tile);
+                    }
+                }
+            }
+
+            // check that returnTerrain isn't null here
+            return returnTerrain;
+        }
+
         private static void LoadTerrainTypes()
         {
             TerrainType[] terrainArray = Resources.LoadAll<TerrainType>("TerrainResources/TerrainTypes");

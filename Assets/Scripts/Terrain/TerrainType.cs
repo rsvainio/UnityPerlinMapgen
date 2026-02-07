@@ -7,14 +7,18 @@ namespace Terrain
     public class TerrainType : ScriptableObject
     {
         [Header("Info")]
-        public string id;
-        public string displayName;
-        public Color baseColor;
+            public string id;
+            [Tooltip("Terrains with a lower priority value will be prioritised when a tile meets the conditions for multiple terrains")]
+            public int priority;
+            [Tooltip("Whether the terrain is included during map generation")]
+            public bool generateAtStartup = false;
+            public string displayName;
+            public Color baseColor;
         [Header("Gameplay")]
-        public float baseMovementCost;
-        //public bool isWalkable;
+            public float baseMovementCost;
+            //public bool isWalkable;
         [Header("Rules")]
-        public TerrainRule[] rules;
+            public TerrainRule[] rules;
 
         public bool MatchesRules(HexTile tile)
         {
