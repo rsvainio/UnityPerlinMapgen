@@ -1,16 +1,16 @@
 using System;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Terrain/Terrain Rule/Precipitation")]
-public class PrecipitationRule : TerrainRule
+namespace Terrain.TerrainRules
 {
-    public override bool MatchesRules(HexTile tile, TerrainRuleParameters parameters)
+    [CreateAssetMenu(menuName = "Terrain/Terrain Rule/Precipitation")]
+    public class PrecipitationRule : TerrainRule
     {
-        if (parameters == null)
+        [Range(0f, 1f)] public float min;
+        [Range(0f, 1f)] public float max;
+        public override bool MatchesRule(HexTile tile)
         {
-            throw new ArgumentNullException(nameof(parameters));
+            return tile.precipitation >= min && tile.precipitation <= max;
         }
-
-        return tile.precipitation >= parameters.min && tile.altitude <= parameters.max;
     }
 }

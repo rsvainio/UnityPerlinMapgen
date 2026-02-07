@@ -12,12 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
   m_Name: ocean
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: ocean
-  displayName: Ocean
-  baseColor: {r: 0.12001601, g: 0.14704813, b: 0.8207547, a: 0}
-  baseMovementCost: 1
-  rules:
-  - ruleLogic: {fileID: 0}
-    parameters:
-      min: 0
-      max: 0
+  id: 
+  displayName: 
+  baseColor: {r: 0, g: 0, b: 0, a: 0}
+  baseMovementCost: 0
+  rules: []

@@ -1,16 +1,16 @@
 using System;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Terrain/Terrain Rule/Temperature")]
-public class TemperatureRule : TerrainRule
+namespace Terrain.TerrainRules
 {
-    public override bool MatchesRules(HexTile tile, TerrainRuleParameters parameters)
+    [CreateAssetMenu(menuName = "Terrain/Terrain Rule/Temperature")]
+    public class TemperatureRule : TerrainRule
     {
-        if (parameters == null)
+        [Range(0f, 1f)] public float min;
+        [Range(0f, 1f)] public float max;
+        public override bool MatchesRule(HexTile tile)
         {
-            throw new ArgumentNullException(nameof(parameters));
+            return tile.temperature >= min && tile.temperature <= max;
         }
-
-        return tile.temperature >= parameters.min && tile.altitude <= parameters.max;
     }
 }

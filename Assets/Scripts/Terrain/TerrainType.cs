@@ -1,4 +1,5 @@
 using UnityEngine;
+using Terrain.TerrainRules;
 
 namespace Terrain
 {
@@ -13,13 +14,13 @@ namespace Terrain
         public float baseMovementCost;
         //public bool isWalkable;
         [Header("Rules")]
-        public TerrainRuleInstance[] rules;
+        public TerrainRule[] rules;
 
         public bool MatchesRules(HexTile tile)
         {
-            foreach (TerrainRuleInstance rule in rules)
+            foreach (TerrainRule rule in rules)
             {
-                if (!rule.ruleLogic.MatchesRules(tile, rule.parameters)) { return false; }
+                if (!rule.MatchesRule(tile)) { return false; }
             }
 
             return true;
