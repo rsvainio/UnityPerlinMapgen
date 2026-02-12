@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace Terrain.TerrainRules
 {
-    [CreateAssetMenu(menuName = "Terrain/Terrain Rule/Temperature")]
-    public class TemperatureRule : TerrainRule
+    [CreateAssetMenu(menuName = "Terrain/Terrain Rule/Temperature Range")]
+    public class TemperatureRange : TerrainRule
     {
         [Range(0f, 1f)] public float min;
         [Range(0f, 1f)] public float max;
