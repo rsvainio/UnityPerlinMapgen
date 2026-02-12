@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
-  m_Name: shrubland
+  m_Name: mountain
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: shrubland
+  id: mountain
   priority: 0
   generateAtStartup: 1
-  displayName: Shrubland
-  baseColor: {r: 0.627451, g: 0.75294125, b: 0.5019608, a: 0}
+  displayName: Mountain
+  baseColor: {r: 0.754717, g: 0.754717, b: 0.754717, a: 0}
   baseMovementCost: 1
   rules: []

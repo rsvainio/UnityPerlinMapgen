@@ -16,15 +16,17 @@ namespace Terrain
             TerrainType returnTerrain = null;
             foreach (TerrainType terrain in terrainTypes.Values)
             {
-                if (returnTerrain != null && (returnTerrain.priority > terrain.priority))
+                if (returnTerrain != null && (returnTerrain.priority < terrain.priority))
                 {
-                    break;
+                    continue;
                 }
-                if (terrain.MatchesRules(tile))
+                else if (terrain.MatchesRules(tile))
                 {
-                    returnTerrain = returnTerrain != null ? returnTerrain : terrain;
-
-                    if (terrain.priority < returnTerrain.priority)
+                    if (returnTerrain == null)
+                    {
+                        returnTerrain = terrain;
+                    }
+                    else if (terrain.priority < returnTerrain.priority)
                     {
                         returnTerrain = terrain;
                     }

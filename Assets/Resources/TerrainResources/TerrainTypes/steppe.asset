@@ -12,11 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
   m_Name: steppe
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: ocean
+  id: steppe
   priority: 0
   generateAtStartup: 1
-  displayName: Ocean
-  baseColor: {r: 0.04705883, g: 0.04705883, b: 0.6862745, a: 0}
+  displayName: Steppe
+  baseColor: {r: 0.75294125, g: 1, b: 0.5019608, a: 0}
   baseMovementCost: 1
-  rules:
-  - {fileID: 11400000, guid: cc99b64eee693974b8faa5a5f32ad5a3, type: 2}
+  rules: []
