@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: shrubland
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: shrubland
-  priority: 0
+  priority: 10
   generateAtStartup: 1
   displayName: Shrubland
   baseColor: {r: 0.627451, g: 0.75294125, b: 0.5019608, a: 0}
   baseMovementCost: 1
-  rules: []
+  rules:
+  - {fileID: 11400000, guid: c1a2914a4fb0294468ee9c4c987f05b1, type: 2}
+  - {fileID: 11400000, guid: 3210382713b7bab49bdb0d520bd2caac, type: 2}

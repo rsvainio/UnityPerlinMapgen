@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: desert
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: desert
-  priority: 0
+  priority: 10
   generateAtStartup: 1
   displayName: Desert
   baseColor: {r: 1, g: 1, b: 0.5058824, a: 0}
   baseMovementCost: 1
-  rules: []
+  rules:
+  - {fileID: 11400000, guid: 4b26f33e5d136d5478d1ea87543a7356, type: 2}
+  - {fileID: 11400000, guid: 39b2998d03c3ec64bbb760f9a2c880a9, type: 2}

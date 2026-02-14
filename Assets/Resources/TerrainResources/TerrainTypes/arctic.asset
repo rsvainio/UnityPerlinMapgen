@@ -10,13 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
-  m_Name: mountain
+  m_Name: arctic
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: mountain
-  priority: 9
+  id: arctic
+  priority: 10
   generateAtStartup: 1
-  displayName: Mountain
-  baseColor: {r: 0.754717, g: 0.754717, b: 0.754717, a: 0}
+  displayName: Arctic
+  baseColor: {r: 0.8773585, g: 0.8773585, b: 0.8773585, a: 0}
   baseMovementCost: 1
   rules:
-  - {fileID: 11400000, guid: e693ea4ef1da5e14c9b358faa3d7153c, type: 2}
+  - {fileID: 11400000, guid: 69c7dbb06dc5f3f4aa9b61f443b7a1b6, type: 2}
+  - {fileID: 11400000, guid: 1fccd44b880c154418ffea4d626bde17, type: 2}

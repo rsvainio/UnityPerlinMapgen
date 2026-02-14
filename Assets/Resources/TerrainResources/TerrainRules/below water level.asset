@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Below Water Level
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.AltitudeRange
   min: 0
-  max: 0.2
+  max: 0.175

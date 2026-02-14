@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de936bb7df7c16f40940ca51cf361328, type: 3}
-  m_Name: mountain
+  m_Name: highland
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
-  id: mountain
+  id: highland
   priority: 9
   generateAtStartup: 1
-  displayName: Mountain
-  baseColor: {r: 0.754717, g: 0.754717, b: 0.754717, a: 0}
+  displayName: Highland
+  baseColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 0}
   baseMovementCost: 1
   rules:
   - {fileID: 11400000, guid: e693ea4ef1da5e14c9b358faa3d7153c, type: 2}

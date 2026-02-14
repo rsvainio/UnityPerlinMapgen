@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: steppe
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: steppe
-  priority: 0
+  priority: 10
   generateAtStartup: 1
   displayName: Steppe
   baseColor: {r: 0.75294125, g: 1, b: 0.5019608, a: 0}
   baseMovementCost: 1
-  rules: []
+  rules:
+  - {fileID: 11400000, guid: cada17b91d44fc64099ae10fc649fd9d, type: 2}
+  - {fileID: 11400000, guid: 2908eeb30b09bfb46bd9d3a564d066d7, type: 2}

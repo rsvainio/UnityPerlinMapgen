@@ -13,9 +13,11 @@ MonoBehaviour:
   m_Name: plain
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: plain
-  priority: 0
+  priority: 10
   generateAtStartup: 1
   displayName: Plain
   baseColor: {r: 0.5019608, g: 0.87843144, b: 0.5019608, a: 0}
   baseMovementCost: 1
-  rules: []
+  rules:
+  - {fileID: 11400000, guid: e8bfbc32ac871394899425eee65c98a8, type: 2}
+  - {fileID: 11400000, guid: 8b4ee03f74c15bb4bac97b9065917e74, type: 2}
