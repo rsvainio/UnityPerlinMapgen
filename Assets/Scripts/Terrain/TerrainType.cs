@@ -9,7 +9,7 @@ namespace Terrain
         [Header("Info")]
             public string id;
             [Tooltip("Terrains with a lower priority value will be prioritised when a tile meets the conditions for multiple terrains")]
-            public int priority;
+            public int priority = 10;
             [Tooltip("Whether the terrain is included during map generation")]
             public bool generateAtStartup = false;
             public string displayName;

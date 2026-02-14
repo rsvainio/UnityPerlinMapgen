@@ -19,17 +19,17 @@ namespace Terrain
             {
                 if (terrain.rules.Length == 0)
                 {
-                    Debug.LogWarning($"Terrain type {terrain.name} has no generation rules, skipping...");
+                    Debug.LogWarning($"Terrain type {terrain.name} has no generation rules, skipping...", terrain);
                     erroneousTerrains.Add(terrain);
                     continue;
                 }
-                else if (returnTerrain != null && (returnTerrain.priority < terrain.priority) || !terrain.generateAtStartup)
+                else if ((returnTerrain != null && (returnTerrain.priority < terrain.priority)) || !terrain.generateAtStartup)
                 {
                     continue;
                 }
                 else if (terrain.MatchesRules(tile))
                 {
-                    if (returnTerrain == null || terrain.priority < returnTerrain.priority)
+                    if (returnTerrain == null || terrain.priority > returnTerrain.priority)
                     {
                         returnTerrain = terrain;
                     }

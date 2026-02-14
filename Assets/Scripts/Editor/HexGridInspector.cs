@@ -175,7 +175,18 @@ public class HexGridInspector : Editor
 
                 foreach (HexTile tile in grid.tilesArray)
                 {
-                    TerrainType matchingTerrain = TerrainDatabase.GetMatchingTerrain(tile);
+                    TerrainType matchingTerrain = null;
+                    if (tile.terrain == TerrainTypes.freshWater) // these tiles would all get overwritten as ocean so this is a temporary fix
+                    {
+                        tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", TerrainTypes.freshWater.baseColor);
+                        continue;
+                    }
+                    else
+                    {
+                        matchingTerrain = TerrainDatabase.GetMatchingTerrain(tile);
+                    }
+
+                    if (matchingTerrain == null) { continue; }
                     tile.terrain = matchingTerrain;
                     tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", matchingTerrain.baseColor);
                 }
