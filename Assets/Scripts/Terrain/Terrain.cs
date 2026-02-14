@@ -14,19 +14,22 @@ namespace Terrain
         public static TerrainType GetMatchingTerrain(HexTile tile)
         {
             TerrainType returnTerrain = null;
+            List<TerrainType> erroneousTerrains = new List<TerrainType>();
             foreach (TerrainType terrain in terrainTypes.Values)
             {
-                if (returnTerrain != null && (returnTerrain.priority < terrain.priority))
+                if (terrain.rules.Length == 0)
+                {
+                    Debug.LogWarning($"Terrain type {terrain.name} has no generation rules, skipping...");
+                    erroneousTerrains.Add(terrain);
+                    continue;
+                }
+                else if (returnTerrain != null && (returnTerrain.priority < terrain.priority) || !terrain.generateAtStartup)
                 {
                     continue;
                 }
                 else if (terrain.MatchesRules(tile))
                 {
-                    if (returnTerrain == null)
-                    {
-                        returnTerrain = terrain;
-                    }
-                    else if (terrain.priority < returnTerrain.priority)
+                    if (returnTerrain == null || terrain.priority < returnTerrain.priority)
                     {
                         returnTerrain = terrain;
                     }
@@ -37,7 +40,12 @@ namespace Terrain
                 }
             }
 
-            // check that returnTerrain isn't null here
+            foreach (TerrainType terrain in erroneousTerrains)
+            {
+                terrainTypes.Remove(terrain.id);
+            }
+
+            Debug.Assert(returnTerrain != null, "No valid terrain was found for tile", tile);
             return returnTerrain;
         }
 

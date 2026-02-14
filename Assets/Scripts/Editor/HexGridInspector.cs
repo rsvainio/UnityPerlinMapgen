@@ -173,24 +173,12 @@ public class HexGridInspector : Editor
                     }
                 }
 
-                ////testing rain shadow calculation
-                //Vector3 windDirection = HexMetrics.ConvertDegreesToVector(90);
-                //Debug.Log($"Wind direction: {windDirection.ToString()}");
-                //List<HexTile> sortedTiles = grid.tilesArray
-                //.OrderBy(t => Vector3.Dot(t.coordinates.ToVec3(), windDirection))
-                //.ToList();
-
-                //int n = 0;
-                //foreach (HexTile tile in sortedTiles)
-                //{
-                //    Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
-
-                //    float gradient = (float)n / sortedTiles.Count;
-                //    Color color = new Color(1f - gradient, 0f, 0.5f + gradient / 2);
-                //    n++;
-
-                //    tileMaterial.SetColor("_Color", color);
-                //}
+                foreach (HexTile tile in grid.tilesArray)
+                {
+                    TerrainType matchingTerrain = TerrainDatabase.GetMatchingTerrain(tile);
+                    tile.terrain = matchingTerrain;
+                    tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", matchingTerrain.baseColor);
+                }
             }
 
             if (GUILayout.Button("Cellular automata pass"))
