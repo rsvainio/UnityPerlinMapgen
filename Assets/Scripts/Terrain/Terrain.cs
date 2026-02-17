@@ -29,7 +29,7 @@ namespace Terrain
                 }
                 else if (terrain.MatchesRules(tile))
                 {
-                    if (returnTerrain == null || terrain.priority > returnTerrain.priority)
+                    if (returnTerrain == null || terrain.priority < returnTerrain.priority)
                     {
                         returnTerrain = terrain;
                     }

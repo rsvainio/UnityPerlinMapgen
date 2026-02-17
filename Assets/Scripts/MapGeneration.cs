@@ -228,10 +228,11 @@ public class MapGeneration
         // varies tile temperatures based on pole and ocean proximity and altitude
         Dictionary<(int, int, int), float> DoTemperatureRefinementPass(bool warmPoles = false)
         {
-            float poleTemp = 0.65f;
+            float poleTemp = 0.4f;
             float equatorTemp = 1.35f;
-            if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.65f; }
+            if (warmPoles) { poleTemp = 1.35f; equatorTemp = 0.25f; }
             Dictionary<(int, int, int), float> newTemperatureMap = new();
+            Dictionary<(int, int, int), float> equatorDistanceMap = new();
             float averageTemperature = 0;
 
             // calculate each tile's distance from the equator and modulate the temperature based on that
@@ -246,15 +247,15 @@ public class MapGeneration
                 int sCoord = key.Item3;
 
                 float distanceFromEquator = Mathf.Abs(rCoord - sCoord) / 2f;
-                distanceFromEquator = 1f - Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
-                float newTemperature = temperature * Mathf.Lerp(poleTemp, equatorTemp, distanceFromEquator);
-
-                //newTemperature = Mathf.Pow(newTemperature, 0.75f + altitude);
-                //newTemperature *= Mathf.Lerp(1.5f, 0.5f, altitude);
+                distanceFromEquator = Mathf.Sin(Mathf.PI * (distanceFromEquator / grid.height));
+                equatorDistanceMap[key] = distanceFromEquator;
+                //float newTemperature = temperature * Mathf.Lerp(equatorTemp, poleTemp, distanceFromEquator);
+                float newTemperature = temperature * Mathf.Lerp(equatorTemp, poleTemp, Mathf.Pow(distanceFromEquator, 2f));
 
                 averageTemperature += newTemperature;
                 newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
             }
+
             averageTemperature /= newTemperatureMap.Count;
             Debug.Log($"Average temperature of the map: {averageTemperature}");
 
@@ -268,8 +269,10 @@ public class MapGeneration
                     float originalTemperature = newTemperatureMap[key];
                     float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
                     float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
+                    float lerpFactor = Mathf.Pow(1f - distanceFromNearestOcean, 2f) * (1f - Mathf.Pow(equatorDistanceMap[key], 3f)); // lessen the impact of ocean proximity based on the distance from the equator
 
-                    float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f)); // the exponent will probably need to be tweaked
+                    //float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, Mathf.Pow(1f - distanceFromNearestOcean, 2f));
+                    float newTemperature = Mathf.Lerp(originalTemperature, averageTemperature, lerpFactor); // the exponent will probably need to be tweaked
                     newTemperature = Mathf.Lerp(newTemperature / 1.5f, newTemperature * 1.5f, Mathf.Pow(1f - altitudeMap[key], 2f));
                     newTemperatureMap[key] = Mathf.Clamp01(newTemperature);
                 }

@@ -18,14 +18,15 @@ public class HexGridInspector : Editor
     float altitudeScale = 7f; // these values are tuned with elevation feature generation in mind
     float altitudeExponent = 2f; // these values are tuned with elevation feature generation in mind
     int altitudeAmplitudes = 4;
-    float temperatureScale = 2f;
-    float temperatureExponent = 1.25f;
+    float temperatureScale = 4.5f;
+    float temperatureExponent = 0.8f;
 
-    bool generatePrecipitationMap = false;
+    bool generatePrecipitationMap = true;
     bool generateAltitudeMap = true;
-    bool generateTemperatureMap = false;
-    bool generateRivers = false;
-    bool generateElevationFeatures = false;
+    bool generateTemperatureMap = true;
+    bool generateRivers = true;
+    bool generateElevationFeatures = true;
+    bool assignTerrains = false;
 
     float cellularAutomataBoundary = 0f;
 
@@ -60,12 +61,12 @@ public class HexGridInspector : Editor
             temperatureScale = EditorGUILayout.Slider("Temperature scale", temperatureScale, 1f, 10f);
             temperatureExponent = EditorGUILayout.Slider("Temperature exponent", temperatureExponent, 0.1f, 5f);
 
-
             generatePrecipitationMap = EditorGUILayout.Toggle("Precipitation map", generatePrecipitationMap);
             generateAltitudeMap = EditorGUILayout.Toggle("Altitude map", generateAltitudeMap);
             generateTemperatureMap = EditorGUILayout.Toggle("Temperature map", generateTemperatureMap);
             generateRivers = EditorGUILayout.Toggle("Generate rivers", generateRivers);
             generateElevationFeatures = EditorGUILayout.Toggle("Generate elevation features", generateElevationFeatures);
+            assignTerrains = EditorGUILayout.Toggle("Assign terrains", assignTerrains);
             //warmPoles = EditorGUILayout.Toggle("Warm poles", warmPoles);
 
             cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
@@ -157,7 +158,7 @@ public class HexGridInspector : Editor
                     //}
                     //else
                     //{
-                    //    tileMaterial.SetColor("_Color", new Color(1f - precipitation, 0.5f * altitude, precipitation));
+                    //    tileMaterial.SetColor("_Color", new Color(temperature, 0.5f * altitude, 1f - temperature));
                     //}
                 }
 
@@ -173,22 +174,25 @@ public class HexGridInspector : Editor
                     }
                 }
 
-                foreach (HexTile tile in grid.tilesArray)
+                if (assignTerrains)
                 {
-                    TerrainType matchingTerrain = null;
-                    if (tile.terrain == TerrainTypes.freshWater) // these tiles would all get overwritten as ocean so this is a temporary fix
+                    foreach (HexTile tile in grid.tilesArray)
                     {
-                        tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", TerrainTypes.freshWater.baseColor);
-                        continue;
-                    }
-                    else
-                    {
-                        matchingTerrain = TerrainDatabase.GetMatchingTerrain(tile);
-                    }
+                        TerrainType matchingTerrain = null;
+                        if (tile.terrain == TerrainTypes.freshWater) // these tiles would all get overwritten as ocean so this is a temporary fix
+                        {
+                            tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", TerrainTypes.freshWater.baseColor);
+                            continue;
+                        }
+                        else
+                        {
+                            matchingTerrain = TerrainDatabase.GetMatchingTerrain(tile);
+                        }
 
-                    if (matchingTerrain == null) { continue; }
-                    tile.terrain = matchingTerrain;
-                    tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", matchingTerrain.baseColor);
+                        if (matchingTerrain == null) { continue; }
+                        tile.terrain = matchingTerrain;
+                        tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", matchingTerrain.baseColor);
+                    }
                 }
             }
 
