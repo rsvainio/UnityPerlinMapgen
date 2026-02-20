@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: mountain
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: mountain
-  priority: 9
+  priority: 8
   generateAtStartup: 1
   displayName: Mountain
   baseColor: {r: 0.754717, g: 0.754717, b: 0.754717, a: 0}

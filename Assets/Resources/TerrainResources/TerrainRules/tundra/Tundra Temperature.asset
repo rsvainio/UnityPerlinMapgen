@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Tundra Temperature
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.TemperatureRange
   min: 0
-  max: 0.2
+  max: 0.3

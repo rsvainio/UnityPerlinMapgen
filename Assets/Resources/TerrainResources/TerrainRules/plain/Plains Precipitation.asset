@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 811b1033bc378fa48a1a527ac17aa2f9, type: 3}
   m_Name: Plains Precipitation
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.PrecipitationRange
-  min: 0.5
+  min: 0.4
   max: 1

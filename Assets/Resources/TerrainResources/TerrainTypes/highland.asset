@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: highland
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: highland
-  priority: 9
+  priority: 8
   generateAtStartup: 1
   displayName: Highland
-  baseColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 0}
+  baseColor: {r: 0.6132076, g: 0.54211664, b: 0.38470098, a: 0}
   baseMovementCost: 1
   rules:
-  - {fileID: 11400000, guid: e693ea4ef1da5e14c9b358faa3d7153c, type: 2}
+  - {fileID: 11400000, guid: de325cbb9ff357640b9d71d85baf245c, type: 2}

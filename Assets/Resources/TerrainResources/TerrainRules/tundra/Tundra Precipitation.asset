@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 811b1033bc378fa48a1a527ac17aa2f9, type: 3}
   m_Name: Tundra Precipitation
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.PrecipitationRange
-  min: 0.1
-  max: 0.3
+  min: 0.25
+  max: 1

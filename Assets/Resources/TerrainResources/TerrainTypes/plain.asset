@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: plain
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: plain
-  priority: 10
+  priority: 11
   generateAtStartup: 1
   displayName: Plain
   baseColor: {r: 0.5019608, g: 0.87843144, b: 0.5019608, a: 0}

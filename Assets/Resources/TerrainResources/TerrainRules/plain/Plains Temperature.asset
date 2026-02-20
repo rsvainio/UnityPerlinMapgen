@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40fc835733d690e44934e26c17ef5e27, type: 3}
   m_Name: Plains Temperature
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.TemperatureRange
-  min: 0.25
+  min: 0.2
   max: 1

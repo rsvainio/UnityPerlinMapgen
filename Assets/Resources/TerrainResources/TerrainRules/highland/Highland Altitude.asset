@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41d67bd41943aa74187ca217f15d5833, type: 3}
   m_Name: Highland Altitude
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.AltitudeRange
-  min: 0.8
-  max: 1
+  min: 0.6
+  max: 0.8

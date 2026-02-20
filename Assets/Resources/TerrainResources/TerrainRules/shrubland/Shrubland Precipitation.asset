@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Shrubland Precipitation
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.PrecipitationRange
   min: 0.2
-  max: 0.4
+  max: 0.3

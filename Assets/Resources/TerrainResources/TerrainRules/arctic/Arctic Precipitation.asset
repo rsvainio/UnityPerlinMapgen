@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Arctic Precipitation
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainRules.PrecipitationRange
   min: 0
-  max: 0.2
+  max: 0.25

@@ -16,7 +16,7 @@ MonoBehaviour:
   priority: 10
   generateAtStartup: 1
   displayName: Steppe
-  baseColor: {r: 0.75294125, g: 1, b: 0.5019608, a: 0}
+  baseColor: {r: 0.8962264, g: 0.84528166, b: 0.56225526, a: 0}
   baseMovementCost: 1
   rules:
   - {fileID: 11400000, guid: cada17b91d44fc64099ae10fc649fd9d, type: 2}

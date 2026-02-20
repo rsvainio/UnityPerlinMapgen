@@ -13,11 +13,10 @@ MonoBehaviour:
   m_Name: tundra
   m_EditorClassIdentifier: Assembly-CSharp::Terrain.TerrainType
   id: tundra
-  priority: 10
+  priority: 9
   generateAtStartup: 1
   displayName: Tundra
   baseColor: {r: 0.37647063, g: 0.5019608, b: 0.5019608, a: 0}
   baseMovementCost: 1
   rules:
   - {fileID: 11400000, guid: 7c413a33c8be3bb4ba98ec99f5fb0bf7, type: 2}
-  - {fileID: 11400000, guid: ddc0bfe8bb2fab842a0de4cfd09ad491, type: 2}
