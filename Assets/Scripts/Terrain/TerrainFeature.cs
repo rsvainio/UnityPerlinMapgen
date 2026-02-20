@@ -1,3 +1,4 @@
+using Terrain.TerrainRules;
 using UnityEngine;
 
 namespace Terrain
@@ -6,16 +7,22 @@ namespace Terrain
     public class TerrainFeature : ScriptableObject
     {
         [Header("Info")]
-        public string id;
-        public string displayName;
+            public string id;
+            public string displayName;
         [Header("Gameplay")]
-        public float movementCostModifier;
-        //public bool isWalkable;
+            public float movementCostModifier;
+            //public bool isWalkable;
+        [Header("Rules")]
+            public TerrainRule[] rules;
 
-        public TerrainFeature(string displayName, float movementCostModifier)
+        public bool MatchesRules(HexTile tile)
         {
-            this.displayName = displayName;
-            this.movementCostModifier = movementCostModifier;
+            foreach (TerrainRule rule in rules)
+            {
+                if (!rule.MatchesRule(tile)) { return false; }
+            }
+
+            return true;
         }
     }
 }

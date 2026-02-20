@@ -15,16 +15,9 @@ namespace Terrain
         public static TerrainType GetMatchingTerrain(HexTile tile)
         {
             TerrainType returnTerrain = null;
-            List<TerrainType> erroneousTerrains = new List<TerrainType>();
             foreach (TerrainType terrain in _terrainTypes.Values)
             {
-                if (terrain.rules.Length == 0)
-                {
-                    Debug.LogWarning($"Terrain type {terrain.name} has no generation rules, skipping...", terrain);
-                    erroneousTerrains.Add(terrain);
-                    continue;
-                }
-                else if ((returnTerrain != null && (returnTerrain.priority < terrain.priority)) || !terrain.generateAtStartup)
+                if ((returnTerrain != null && (returnTerrain.priority < terrain.priority)) || !terrain.generateAtStartup)
                 {
                     continue;
                 }
@@ -41,11 +34,6 @@ namespace Terrain
                 }
             }
 
-            foreach (TerrainType terrain in erroneousTerrains)
-            {
-                _terrainTypes.Remove(terrain.id);
-            }
-
             Debug.Assert(returnTerrain != null, "No valid terrain was found for tile", tile);
             return returnTerrain;
         }
@@ -55,6 +43,12 @@ namespace Terrain
             TerrainType[] terrainArray = Resources.LoadAll<TerrainType>("TerrainResources/TerrainTypes");
             foreach (TerrainType terrainType in terrainArray)
             {
+                if (terrainType.rules.Length == 0)
+                {
+                    Debug.LogWarning($"Terrain type {terrainType.name} has no generation rules, skipping...", terrainType);
+                    continue;
+                }
+
                 _terrainTypes[terrainType.id] = terrainType;
             }
         }
@@ -64,6 +58,12 @@ namespace Terrain
             TerrainFeature[] terrainArray = Resources.LoadAll<TerrainFeature>("TerrainResources/TerrainFeatures");
             foreach (TerrainFeature terrainFeature in terrainArray)
             {
+                if (terrainFeature.rules.Length == 0)
+                {
+                    Debug.LogWarning($"Terrain type {terrainFeature.name} has no generation rules, skipping...", terrainFeature);
+                    continue;
+                }
+
                 _terrainFeatures[terrainFeature.id] = terrainFeature;
             }
         }
