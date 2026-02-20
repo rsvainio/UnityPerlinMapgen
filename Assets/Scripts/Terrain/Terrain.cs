@@ -1,21 +1,22 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Terrain
 {
     public static class TerrainDatabase
     {
-        private static readonly Dictionary<string, TerrainType> terrainTypes = new();
-        private static readonly Dictionary<string, TerrainFeature> terrainFeatures = new();
+        private static readonly Dictionary<string, TerrainType> _terrainTypes = new();
+        private static readonly Dictionary<string, TerrainFeature> _terrainFeatures = new();
 
-        public static TerrainType GetTerrainType(string id) => terrainTypes[id];
-        public static TerrainFeature GetTerrainFeature(string id) => terrainFeatures[id];
+        public static TerrainType GetTerrainType(string id) => _terrainTypes[id];
+        public static TerrainFeature GetTerrainFeature(string id) => _terrainFeatures[id];
 
         public static TerrainType GetMatchingTerrain(HexTile tile)
         {
             TerrainType returnTerrain = null;
             List<TerrainType> erroneousTerrains = new List<TerrainType>();
-            foreach (TerrainType terrain in terrainTypes.Values)
+            foreach (TerrainType terrain in _terrainTypes.Values)
             {
                 if (terrain.rules.Length == 0)
                 {
@@ -42,7 +43,7 @@ namespace Terrain
 
             foreach (TerrainType terrain in erroneousTerrains)
             {
-                terrainTypes.Remove(terrain.id);
+                _terrainTypes.Remove(terrain.id);
             }
 
             Debug.Assert(returnTerrain != null, "No valid terrain was found for tile", tile);
@@ -54,7 +55,7 @@ namespace Terrain
             TerrainType[] terrainArray = Resources.LoadAll<TerrainType>("TerrainResources/TerrainTypes");
             foreach (TerrainType terrainType in terrainArray)
             {
-                terrainTypes[terrainType.id] = terrainType;
+                _terrainTypes[terrainType.id] = terrainType;
             }
         }
 
@@ -63,15 +64,18 @@ namespace Terrain
             TerrainFeature[] terrainArray = Resources.LoadAll<TerrainFeature>("TerrainResources/TerrainFeatures");
             foreach (TerrainFeature terrainFeature in terrainArray)
             {
-                terrainFeatures[terrainFeature.id] = terrainFeature;
+                _terrainFeatures[terrainFeature.id] = terrainFeature;
             }
         }
 
         static TerrainDatabase()
         {
             LoadTerrainTypes();
+            // sorting by terraintype priority makes getting a tile's matching terrain more efficient
+            // this is technically a hacky solution as dictionaries are by definition unordered and as such converting from a LINQ-query back to a dictionary isn't guaranteed to preserve that order
+            _terrainTypes = _terrainTypes.OrderBy(d => d.Value.priority).ToDictionary(d => d.Key, d => d.Value);
             LoadTerrainFeatures();
-            Debug.Log($"Loaded {terrainTypes.Count} TerrainTypes and {terrainFeatures.Count} TerrainFeatures");
+            Debug.Log($"Loaded {_terrainTypes.Count} TerrainTypes and {_terrainFeatures.Count} TerrainFeatures");
         }
     }
 
