@@ -33,7 +33,7 @@ public class MapGeneration
     // should reorganize these to have altitude be the first function as precipitation and temperature generation are dependent on it
     public Dictionary<(int, int, int), float> GeneratePrecipitationMap(float scale = 2f, float exponent = 2f, int amplitudeCount = 4, float fudgeFactor = 1.2f)
     {   
-        //precipitationMap = GenerateNoiseMap(scale, exponent);
+        precipitationMap = GenerateNoiseMap(scale, exponent);
         precipitationMap = SimulateRainShadow();
 
         // assign precipitation values to tiles here before returning the altitude map
@@ -68,10 +68,8 @@ public class MapGeneration
                 }
                 else
                 {
-                    startingCloudCover = 0.1f;
-                    //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance beyond which starting precipitation will be 0
-                    //float distanceFromNearestOcean = oceanDistanceMap[key] / maxDistance;
-                    //startingPrecipitation = 1f - Mathf.Min(distanceFromNearestOcean, 1f);
+                    startingCloudCover = precipitationMap[key];
+                    //startingCloudCover = 0.1f;
                 }
                 cloudCoverMap[key] = startingCloudCover;
             }
