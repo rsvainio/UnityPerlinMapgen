@@ -4,6 +4,7 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 using Vector3 = UnityEngine.Vector3;
 using Terrain;
+using Unity.VisualScripting;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -128,7 +129,7 @@ public class MapGeneration
             GenerateElevationFeatures();
         }
 
-        // water boundary generation
+        //GenerateMountainRanges();
         GenerateWaterBoundary();
 
         altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
@@ -143,12 +144,12 @@ public class MapGeneration
         CategorizeWaterTiles(); // elevation shouldn't change after this so we can map water tiles here
         return altitudeMap;
 
-        Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainRangeCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
+        Dictionary<(int, int, int), float> GenerateElevationFeatures(int mountainMaskCount = 3, float mountainScale = 7f, float mountainExponent = 1f)
         {
             // mountain range generation
             Dictionary<(int, int, int), float> mountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
             Dictionary<(int, int, int), float> mixValueMask = GenerateNoiseMap(scale: 4f, exponent: 2f);
-            for (int i = 0; i < mountainRangeCount - 1; i++)
+            for (int i = 0; i < mountainMaskCount - 1; i++)
             {
                 Dictionary<(int, int, int), float> newMountainMask = GenerateNoiseMap(scale: mountainScale, exponent: mountainExponent);
                 foreach (KeyValuePair<(int, int, int), float> entry in newMountainMask)
@@ -171,6 +172,56 @@ public class MapGeneration
             }
 
             altitudeMap = mountainMask;
+            return altitudeMap;
+        }
+
+        Dictionary<(int, int, int), float> GenerateMountainRanges(int mountainRangeCount = 3)
+        {
+            int mountainRangeMaxLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.25f); // 25% of the map
+            int maxAttempts = 10;
+            for (int i = 0; i < mountainRangeCount; i++)
+            {
+                HexTile mountainRangeStart = grid.tilesArray[Random.Range(0, grid.tilesArray.Length)];
+                if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater)
+                {
+                    i--;
+                    continue;
+                }
+
+                HexTile mountainRangeEnd = null;
+                List<HexTile> validMountainRangeEnds = mountainRangeStart.GetTilesAtRange(mountainRangeMaxLength);
+                while (validMountainRangeEnds.Count > 0)
+                {
+                    mountainRangeEnd = validMountainRangeEnds[Random.Range(0, validMountainRangeEnds.Count)];
+                    if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater)
+                    {
+                        validMountainRangeEnds.Remove(mountainRangeEnd);
+                        mountainRangeEnd = null;
+                        continue;
+                    }
+                    break;
+                }
+                if (mountainRangeEnd == null) // failed to find a suitable endpoint to this mountain range
+                {
+                    maxAttempts--;
+                    Debug.Log("Failed to find a suitable endpoint for a mountain range", mountainRangeStart);
+                    
+                    if (maxAttempts == 0)
+                    {
+                        Debug.LogWarning($"Reached max number of attempts during mountain range generation. Generated {i} mountain range(s) successfully");
+                        break;
+                    }
+                    else
+                    {
+                        i--;
+                        continue;
+                    }
+                }
+
+                // TODO: implement pathfinding from mountainRangeStart to mountainRangeEnd and elevate all the tiles in and around that path
+            }
+
+            // altitudeMap = ;
             return altitudeMap;
         }
 
