@@ -1,11 +1,13 @@
 using System;
 
+// could potentially make this support both max and min heaps if needed
 public class Heap<T> where T : IHeapItem<T>
 {
+    public bool maxHeap { get; private set; }
     public int Count => _currentItemCount;
 
     private T[] _heap;
-    private int _currentItemCount;
+    private int _currentItemCount = 0;
 
     public T Parent(T item) => (item.heapIndex - 1) / 2 == 1 ? default : _heap[(item.heapIndex - 1) / 2];
     public T Left(T item) => item.heapIndex * 2 + 1 <= _currentItemCount ? _heap[item.heapIndex * 2 + 1] : default;
@@ -35,6 +37,8 @@ public class Heap<T> where T : IHeapItem<T>
 
         return firstItem;
     }
+
+    public void UpdateItem(T item) => SortUp(item);
 
     private void SortDown(T item)
     {
@@ -96,16 +100,6 @@ public class Heap<T> where T : IHeapItem<T>
         _heap[itemB.heapIndex] = itemA;
 
         (itemA.heapIndex, itemB.heapIndex) = (itemB.heapIndex, itemA.heapIndex);
-    }
-}
-
-public class PathNode : IHeapItem<PathNode>
-{
-    public int heapIndex { get; set; }
-
-    public int CompareTo(PathNode other)
-    {
-        throw new NotImplementedException();
     }
 }
 
