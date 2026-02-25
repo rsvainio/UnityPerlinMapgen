@@ -40,6 +40,11 @@ public class Heap<T> where T : IHeapItem<T>
 
     public void UpdateItem(T item) => SortUp(item);
 
+    public bool Contains(T item)
+    {
+        return Equals(_heap[item.heapIndex], item);
+    }
+
     private void SortDown(T item)
     {
         while (true)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class Pathfinding
 {
@@ -12,35 +13,64 @@ public class Pathfinding
         _nodes = BuildNodeMap(grid);
     }
 
-    public List<HexTile> A_star(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic)
+    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic = null)
     {
-        PathNode startNode = new PathNode(startTile);
-        PathNode endNode = new PathNode(endTile);
+        // if this is made to work with multiple PathNode layers then 
+        PathNode startNode = _nodes[startTile.coordinates.ToTuple()];
+        PathNode endNode = _nodes[endTile.coordinates.ToTuple()];
+        heuristic ??= CubeDistanceHeuristic;
+
+        List<PathNode> nodePath = A_star(startNode, endNode, heuristic);
+        List<HexTile> tilePath = new List<HexTile>();
+        nodePath.ForEach(x => tilePath.Add(x.tile));
+        ResetNodes();
+        return tilePath;
+    }
+
+    private List<PathNode> A_star(PathNode startNode, PathNode endNode, Func<PathNode, PathNode, int> heuristic)
+    {
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
         openSet.Insert(startNode);
         startNode.gScore = 0;
         startNode.hScore = heuristic(startNode, endNode);
 
-        while (openSet.Count < 0)
+        while (openSet.Count > 0)
         {
             PathNode current = openSet.ExtractFirst();
             if (current == endNode)
             {
-                List<PathNode> nodePath = ReconstructPath(endNode);
-                List<HexTile> tilePath = new List<HexTile>();
-                nodePath.ForEach(x => tilePath.Add(x.tile));
-                return tilePath;
+                // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
+                return ReconstructPath(endNode);
             }
 
             foreach (PathNode neighbor in GetNeighbors(current))
             {
-                // continue here
+                int moveCost = current.gScore + neighbor.movementCost;
+                if (moveCost < neighbor.gScore || !openSet.Contains(neighbor))
+                {
+                    neighbor.cameFrom = current;
+                    neighbor.gScore = moveCost;
+                    neighbor.hScore = heuristic(neighbor, endNode);
+
+                    if (!openSet.Contains(neighbor))
+                    {
+                        openSet.Insert(neighbor);
+                    }
+                    else
+                    {
+                        openSet.UpdateItem(neighbor);
+                    }
+                }
             }
         }
+
+        Debug.LogWarning("Failed to find a valid path from tile:", startNode.tile);
+        Debug.LogWarning("Target tile:", endNode.tile);
+        return new List<PathNode>(); // failed to find a valid path from startNode to endNode
     }
 
     // different heuristic functions could be collected into a static class or something like that
-    public static int Heuristic(PathNode a, PathNode b)
+    public static int CubeDistanceHeuristic(PathNode a, PathNode b)
     {
         return HexCoordinates.HexDistance(a.tile, b.tile);
     }
@@ -80,6 +110,16 @@ public class Pathfinding
         return neighbors;
     }
 
+    private void ResetNodes()
+    {
+        foreach (PathNode node in _nodes.Values)
+        {
+            node.gScore = int.MaxValue;
+            node.hScore = 0;
+            node.cameFrom = null;
+        }
+    }
+
     // TODO: implement this
     private Dictionary<(int, int, int), PathNode> BuildNodeMap(HexGrid grid)
     {
@@ -94,18 +134,24 @@ public class PathNode : IHeapItem<PathNode>
 {
     public HexTile tile { get; }
     public int heapIndex { get; set; }
-
     public List<PathNode> neighbors { get; set; }
 
     // A* properties
-    public PathNode cameFrom { get; set; }
-    public int gScore { get; set; } // the cost of the cheapest known path from start to this node
-    public int hScore { get; set; } // this node's heuristic score, which naturally depends on the heuristic function used
+    public PathNode cameFrom { get; set; } = null;
+    public int gScore { get; set; } = int.MaxValue; // the cost of the cheapest known path from start to this node
+    public int hScore { get; set; } = 0; // this node's heuristic score, which naturally depends on the heuristic function used
     public int fScore => gScore + hScore; // the best guess as to how cheap a path from start to finish could be, if it passes through this node
+    public int movementCost { get; private set; } // equal to the underlying HexTile's terrain movement cost, if no HexTile is present likely a calculated average of all the movement costs of this PathNode's HexTiles 
 
     public PathNode(HexTile tile)
     {
         this.tile = tile;
+        movementCost = tile.terrain.movementCost;
+    }
+
+    public PathNode() 
+    {
+        movementCost = 0;
     }
 
     public int CompareTo(PathNode other)
