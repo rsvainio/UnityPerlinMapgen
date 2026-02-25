@@ -146,7 +146,7 @@ public class PathNode : IHeapItem<PathNode>
     public PathNode(HexTile tile)
     {
         this.tile = tile;
-        movementCost = tile.terrain.movementCost;
+        movementCost = tile.movementCost;
     }
 
     public PathNode() 

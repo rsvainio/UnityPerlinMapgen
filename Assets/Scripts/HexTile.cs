@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Terrain;
 
-// TODO: rewrite all the fields to be properties where reasonable
 public class HexTile : MonoBehaviour
 {
     public HexCoordinates coordinates { get; private set; }
@@ -11,7 +10,11 @@ public class HexTile : MonoBehaviour
     public float altitude { get; set; }
     public float temperature { get; set; }
     public float precipitation { get; set; }
-    public TerrainType terrain { get; set; }
+    public TerrainType terrain { 
+        get {  return _terrain; }
+        set { _terrain = value; UpdateMovementCost(); }
+    }
+    public int movementCost { get; private set; }
     public bool hasRiver { get; set; } = false;
     public HexTile[] neighbors
     {
@@ -19,14 +22,14 @@ public class HexTile : MonoBehaviour
     }
 
     private HexGrid _grid;
-    private HexTile[] _neighbors;
+    private TerrainType _terrain;
+    private HexTile[] _neighbors = null;
 
     public void Initialize(int q, int r, int s, TerrainType terrain, HexGrid grid)
     {
         this.coordinates = new HexCoordinates(q, r, s);
         this.stringcoords = $"{q}, {r}, {s}";
-        this.terrain = terrain;
-        this._neighbors = null;
+        this._terrain = terrain;
         this._grid = grid;
     }
 
@@ -38,36 +41,12 @@ public class HexTile : MonoBehaviour
         hasRiver = false;
     }
 
-    // returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null at call time
-    private HexTile[] GetNeighbors()
-    {
-        HexCoordinates[] neighborCoordinates = GetNeighborCoordinates();
-        Dictionary<(int, int, int), HexTile> _gridTiles = _grid.tiles;
-        _neighbors = new HexTile[neighborCoordinates.Length];
-        int j = 0;
-
-        for (int i = 0; i < _neighbors.Length; i++)
-        {
-            if (_gridTiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
-            {
-                _neighbors[i - j] = tile;
-            }
-            else
-            {
-                j++;
-            }
-        }
-
-        Array.Resize(ref _neighbors, _neighbors.Length - j);
-        return _neighbors;
-    }
-
     public HexCoordinates GetCoordinatesInDirection(Vector3 vector)
     {
         float bestDotProduct = 0f;
         HexCoordinates bestDirection = HexMetrics.neighborVectors[0];
 
-        foreach(HexCoordinates coordinate in HexMetrics.neighborVectors)
+        foreach (HexCoordinates coordinate in HexMetrics.neighborVectors)
         {
             float dot = Vector3.Dot(coordinate.ToVec3(), vector);
             if (dot > bestDotProduct)
@@ -127,18 +106,46 @@ public class HexTile : MonoBehaviour
 
         return neighborCoordinates;
     }
-}
 
-public struct TileAttributes
-{
-    public TileAttributes(float altitude, float temperature, float precipitation)
+    // returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null at call time
+    private HexTile[] GetNeighbors()
     {
-        this.altitude = altitude;
-        this.temperature = temperature;
-        this.precipitation = precipitation;
+        HexCoordinates[] neighborCoordinates = GetNeighborCoordinates(); // TODO: there is no reason to separately fetch the coordinates, remove this
+        _neighbors = new HexTile[neighborCoordinates.Length];
+        int j = 0;
+
+        for (int i = 0; i < _neighbors.Length; i++)
+        {
+            if (_grid.tiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
+            {
+                _neighbors[i - j] = tile;
+            }
+            else
+            {
+                j++;
+            }
+        }
+
+        Array.Resize(ref _neighbors, _neighbors.Length - j);
+        return _neighbors;
     }
 
-    public float altitude { get; set; }
-    public float temperature { get; set; }
-    public float precipitation { get; set; }
+    private void UpdateMovementCost()
+    {
+        movementCost = terrain.baseMovementCost;
+    }
 }
+
+//public class TileAttributes
+//{
+//    public TileAttributes(float altitude, float temperature, float precipitation)
+//    {
+//        this.altitude = altitude;
+//        this.temperature = temperature;
+//        this.precipitation = precipitation;
+//    }
+
+//    public float altitude { get; set; }
+//    public float temperature { get; set; }
+//    public float precipitation { get; set; }
+//}
