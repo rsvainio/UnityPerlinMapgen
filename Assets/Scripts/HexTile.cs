@@ -37,7 +37,7 @@ public class HexTile : MonoBehaviour
     public void ResetTile()
     {
         altitude = temperature = precipitation = 0f;
-        terrain = null;
+        _terrain = null;
         hasRiver = false;
     }
 
@@ -132,7 +132,7 @@ public class HexTile : MonoBehaviour
 
     private void UpdateMovementCost()
     {
-        movementCost = terrain.baseMovementCost;
+        movementCost = _terrain.baseMovementCost;
     }
 }
 

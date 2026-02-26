@@ -10,6 +10,8 @@ public class HexGrid : MonoBehaviour
     public Dictionary<(int, int, int), HexTile> tiles { get; private set; } = new Dictionary<(int, int, int), HexTile>();
     public HexTile[] tilesArray => tiles.Values.ToArray();
     public List<HexTile> borderTiles { get; private set; } = new List<HexTile>();
+    public Pathfinding pathfinding { get; private set; }
+
     public List<List<HexTile>> rivers { get; set; } = new List<List<HexTile>>();
     public readonly float waterLevel = 0.175f; // this will probably be moved elsewhere later
     public Color defaultColor { get; set; } = Color.white ;
@@ -26,10 +28,21 @@ public class HexGrid : MonoBehaviour
 
         GenerateGrid();
         BuildBorderTileList();
+        pathfinding = new Pathfinding(this);
         //MapGeneration.GenerateCellularAutomataMap(this);
     }
+   
+    public void ResetGrid()
+    {
+        foreach (HexTile tile in tiles.Values)
+        {
+            tile.ResetTile();
+        }
+        rivers.Clear();
+        pathfinding = new Pathfinding(this);
+    }
 
-    public void DestroyGrid()
+    private void DestroyGrid()
     {
         foreach (HexTile tile in tiles.Values)
         {
@@ -40,15 +53,6 @@ public class HexGrid : MonoBehaviour
         tiles.Clear();
     }
 
-    public void ResetGrid()
-    {
-        foreach (HexTile tile in tiles.Values)
-        {
-            tile.ResetTile();
-        }
-        rivers.Clear();
-    }
-    
     private void Update()
     {
         if (Input.GetMouseButton(0))

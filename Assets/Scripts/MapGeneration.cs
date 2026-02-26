@@ -4,7 +4,6 @@ using UnityEngine;
 using Random = UnityEngine.Random;
 using Vector3 = UnityEngine.Vector3;
 using Terrain;
-using Unity.VisualScripting;
 
 /*
 this class is going to contain different types of map generation, just to see what works and what doesn't
@@ -129,7 +128,7 @@ public class MapGeneration
             GenerateElevationFeatures();
         }
 
-        //GenerateMountainRanges();
+        GenerateMountainRanges();
         GenerateWaterBoundary();
 
         altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
@@ -175,14 +174,15 @@ public class MapGeneration
             return altitudeMap;
         }
 
-        Dictionary<(int, int, int), float> GenerateMountainRanges(int mountainRangeCount = 3)
+        void GenerateMountainRanges(int mountainRangeCount = 1)
         {
             int mountainRangeMaxLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.25f); // 25% of the map
             int maxAttempts = 10;
+            Debug.Log($"Generating {mountainRangeCount} mountain ranges...");
             for (int i = 0; i < mountainRangeCount; i++)
             {
                 HexTile mountainRangeStart = grid.tilesArray[Random.Range(0, grid.tilesArray.Length)];
-                if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater)
+                if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater) // terrains aren't actually set by this point so this doesn't work
                 {
                     i--;
                     continue;
@@ -218,11 +218,18 @@ public class MapGeneration
                     }
                 }
 
-                // TODO: implement pathfinding from mountainRangeStart to mountainRangeEnd and elevate all the tiles in and around that path
-            }
+                // there is currently a bug where a few tiles get cut from both ends of the mountain path
+                // whether this bug is from this function or pathfinding is unclear
+                List<HexTile> mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd);
+                Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Generated mountain range ");
+                foreach (HexTile tile in mountainPath)
+                {
+                    altitudeMap[tile.coordinates.ToTuple()] = 1.5f; // debugging
+                }
 
-            // altitudeMap = ;
-            return altitudeMap;
+                Debug.Log("Generated a mountain range from", mountainRangeStart);
+                Debug.Log("To", mountainRangeEnd);
+            }
         }
 
         Dictionary<(int, int, int), float> GenerateWaterBoundary()
@@ -723,6 +730,7 @@ public class MapGeneration
             }
         }
 
+        Debug.Log("Finished ocean mapping");
         return;
     }
 

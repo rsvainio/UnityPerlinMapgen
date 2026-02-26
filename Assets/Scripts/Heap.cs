@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 // could potentially make this support both max and min heaps if needed
 public class Heap<T> where T : IHeapItem<T>
@@ -9,7 +10,8 @@ public class Heap<T> where T : IHeapItem<T>
     private T[] _heap;
     private int _currentItemCount = 0;
 
-    public T Parent(T item) => (item.heapIndex - 1) / 2 == 1 ? default : _heap[(item.heapIndex - 1) / 2];
+    //public T Parent(T item) => (item.heapIndex - 1) / 2 == 1 ? default : _heap[(item.heapIndex - 1) / 2];
+    public T Parent(T item) => item.heapIndex == 0 ? default : _heap[Mathf.FloorToInt((item.heapIndex - 1) / 2f)];
     public T Left(T item) => item.heapIndex * 2 + 1 <= _currentItemCount ? _heap[item.heapIndex * 2 + 1] : default;
     public T Right(T item) => item.heapIndex * 2 + 2 <= _currentItemCount ? _heap[item.heapIndex * 2 + 2] : default;
 
@@ -33,7 +35,7 @@ public class Heap<T> where T : IHeapItem<T>
 
         _heap[0] = _heap[_currentItemCount];
         _heap[0].heapIndex = 0;
-        SortDown(firstItem);
+        SortDown(_heap[0]);
 
         return firstItem;
     }
@@ -53,16 +55,13 @@ public class Heap<T> where T : IHeapItem<T>
             T rightChild = Right(item);
             T itemToSwap;
 
-            if (leftChild.heapIndex < _currentItemCount)
+            if (leftChild != null)
             {
                 itemToSwap = leftChild;
 
-                if (rightChild.heapIndex < _currentItemCount)
+                if (rightChild != null && leftChild.CompareTo(rightChild) < 0)
                 {
-                    if (leftChild.CompareTo(rightChild) < 0)
-                    {
-                        itemToSwap = rightChild;
-                    }
+                    itemToSwap = rightChild;
                 }
 
                 // swap the items if item is lower than itemToSwap
@@ -88,7 +87,7 @@ public class Heap<T> where T : IHeapItem<T>
         {
             T parent = Parent(item);
 
-            if (item.CompareTo(parent) > 0) // need to check for null
+            if (parent != null && item.CompareTo(parent) > 0)
             {
                 Swap(item, parent);
             }
