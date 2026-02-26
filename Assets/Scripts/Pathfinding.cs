@@ -5,12 +5,12 @@ using UnityEngine;
 public class Pathfinding
 {
     private HexGrid _grid;
-    private Dictionary<(int, int, int), PathNode> _nodes;
+    private Dictionary<(int, int, int), PathNode> _nodes = new();
 
     public Pathfinding(HexGrid grid)
     {
         _grid = grid;
-        _nodes = BuildNodeMap(grid);
+        BuildNodeMap();
     }
 
     public List<HexTile> FindPath(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic = null)
@@ -29,6 +29,7 @@ public class Pathfinding
 
     private List<PathNode> A_star(PathNode startNode, PathNode endNode, Func<PathNode, PathNode, int> heuristic)
     {
+        Debug.Log("Starting pathfinding...", startNode.tile);
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
         openSet.Insert(startNode);
         startNode.gScore = 0;
@@ -40,13 +41,14 @@ public class Pathfinding
             if (current == endNode)
             {
                 // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
+                Debug.Log("Finished pathfinding", endNode.tile);
                 return ReconstructPath(endNode);
             }
 
             foreach (PathNode neighbor in GetNeighbors(current))
             {
                 int moveCost = current.gScore + neighbor.movementCost;
-                if (moveCost < neighbor.gScore || !openSet.Contains(neighbor))
+                if (moveCost < neighbor.gScore)
                 {
                     neighbor.cameFrom = current;
                     neighbor.gScore = moveCost;
@@ -83,6 +85,7 @@ public class Pathfinding
         PathNode current = endNode;
         while (current.cameFrom != null)
         {
+            (int, int, int) key = current.tile.coordinates.ToTuple();
             path.Add(current.cameFrom);
             current = current.cameFrom;
         }
@@ -121,9 +124,12 @@ public class Pathfinding
     }
 
     // TODO: implement this
-    private Dictionary<(int, int, int), PathNode> BuildNodeMap(HexGrid grid)
+    private void BuildNodeMap()
     {
-        throw new NotImplementedException();
+        foreach(KeyValuePair<(int, int, int), HexTile> entry in _grid.tiles)
+        {
+            _nodes.Add(entry.Key, new PathNode(entry.Value));
+        }
     }
 }
 
