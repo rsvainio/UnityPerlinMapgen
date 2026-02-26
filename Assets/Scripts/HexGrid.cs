@@ -15,7 +15,7 @@ public class HexGrid : MonoBehaviour
     public List<List<HexTile>> rivers { get; set; } = new List<List<HexTile>>();
     public readonly float waterLevel = 0.175f; // this will probably be moved elsewhere later
     public Color defaultColor { get; set; } = Color.white ;
-    public Color touchedColor { get; set; } = Color.magenta;
+    public Color testingColor { get; set; } = Color.magenta;
     public HexTile tilePrefab;
     public Text tileLabelPrefab;
 
@@ -86,7 +86,7 @@ public class HexGrid : MonoBehaviour
     private void ChangeColor(HexTile tile)
     {
         //both of the color-changing methods work, not sure what the benefits to each are
-        tile.GetComponentInChildren<MeshRenderer>().material.color = touchedColor;
+        //tile.GetComponentInChildren<MeshRenderer>().material.color = touchedColor;
         //tile.GetComponentInChildren<MeshFilter>().mesh = GenerateHexMesh(touchedColor);
 
         Debug.Log("changed color of hex at " + tile.coordinates.ToString());

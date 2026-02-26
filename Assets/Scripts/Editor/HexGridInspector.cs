@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using Terrain;
@@ -75,6 +76,7 @@ public class HexGridInspector : Editor
             //if (GUILayout.Button("Clear Grid")) { ClearGrid(grid); }
             if (GUILayout.Button("Generate Noisemaps"))
             {
+                ClearLog();
                 if (grid.tiles.Count != grid.height * grid.width)
                 {
                     Debug.Log("Tile count differs from grid size, regenerating...");
@@ -105,6 +107,10 @@ public class HexGridInspector : Editor
                     if (generateTemperatureMap) { temperature = tile.temperature; }
 
                     Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
+                    if (tileMaterial.GetColor("_Color").Equals(grid.testingColor))
+                    {
+                        continue;
+                    }
                     if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
 
                     // tile color assignment
@@ -151,15 +157,16 @@ public class HexGridInspector : Editor
                         precipitationColor = new Color(0f, 0f, precipitation * 0.5f);
                         colorBlend += precipitationColor;
                     }
-                    tileMaterial.SetColor("_Color", colorBlend);
-                    //if (altitude <= grid.waterLevel)
-                    //{
-                    //    tileMaterial.SetColor("_Color", altitudeColor);
-                    //}
-                    //else
-                    //{
-                    //    tileMaterial.SetColor("_Color", new Color(temperature, 0.5f * altitude, 1f - temperature));
-                    //}
+
+                    //tileMaterial.SetColor("_Color", colorBlend);
+                    if (altitude <= grid.waterLevel)
+                    {
+                        tileMaterial.SetColor("_Color", altitudeColor);
+                    }
+                    else
+                    {
+                        tileMaterial.SetColor("_Color", new Color(0f, altitude, 0f));
+                    }
                 }
 
                 if (generateRivers)
@@ -395,13 +402,16 @@ public class HexGridInspector : Editor
         }
     }
 
+    private void ClearLog()
+    {
+        var assembly = Assembly.GetAssembly(typeof(UnityEditor.Editor));
+        var type = assembly.GetType("UnityEditor.LogEntries");
+        var method = type.GetMethod("Clear");
+        method.Invoke(new object(), null);
+    }
+
     static void GenerateGrid(HexGrid grid)
     {
         grid.Initialize();
-    }
-
-    static void ClearGrid(HexGrid grid)
-    {
-        grid.DestroyGrid();
     }
 }
