@@ -98,20 +98,16 @@ public class HexGridInspector : Editor
 
                 foreach (HexTile tile in grid.tilesArray)
                 {
-                    //(int, int, int) coordinates = tile.coordinates.ToTuple();
-
                     float precipitation, temperature, altitude;
                     precipitation = temperature = altitude = 0f;
                     if (generatePrecipitationMap) { precipitation = tile.precipitation; }
                     if (generateAltitudeMap) { altitude = tile.altitude; }
                     if (generateTemperatureMap) { temperature = tile.temperature; }
-
                     Material tileMaterial = tile.GetComponentInChildren<Renderer>().material;
                     if (tileMaterial.GetColor("_Color").Equals(grid.testingColor))
                     {
                         continue;
                     }
-                    if (tileMaterial.HasColor("_Color")) { tileMaterial.SetColor("_Color", new Color(0f, 0f, 0f)); }
 
                     // tile color assignment
                     Color colorBlend = new Color(0f, 0f, 0f);

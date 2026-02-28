@@ -14,8 +14,8 @@ public class HexGrid : MonoBehaviour
 
     public List<List<HexTile>> rivers { get; set; } = new List<List<HexTile>>();
     public readonly float waterLevel = 0.175f; // this will probably be moved elsewhere later
-    public Color defaultColor { get; set; } = Color.white ;
-    public Color testingColor { get; set; } = Color.magenta;
+    public Color defaultColor { get; private set; } = Color.white;
+    public Color testingColor { get; private set; } = Color.magenta;
     public HexTile tilePrefab;
     public Text tileLabelPrefab;
 
@@ -67,7 +67,6 @@ public class HexGrid : MonoBehaviour
         Ray inputRay = Camera.main.ScreenPointToRay(mousePosition);
         if (Physics.Raycast(inputRay, out RaycastHit hit))
         {
-            //ChangeColor(hit.collider.GetComponentInParent<HexTile>());
             //ChangeColor(hit.collider.GetComponentInParent<HexTile>());
             ChangeClusterColor(hit.collider.GetComponentInParent<HexTile>());
             //TouchTile(hit.point);
