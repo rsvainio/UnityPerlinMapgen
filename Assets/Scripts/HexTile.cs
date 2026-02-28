@@ -39,6 +39,7 @@ public class HexTile : MonoBehaviour
         altitude = temperature = precipitation = 0f;
         _terrain = null;
         hasRiver = false;
+        this.GetComponentInChildren<Renderer>().material.SetColor("_Color", _grid.defaultColor);
     }
 
     public HexCoordinates GetCoordinatesInDirection(Vector3 vector)
@@ -59,7 +60,7 @@ public class HexTile : MonoBehaviour
         return coordinates.HexAdd(bestDirection);
     }
 
-    // returns a list of each HexTile that is at most a distance of range from this tile
+    // returns a list containing each HexTile that is at most a distance of range from this tile
     public List<HexTile> GetTilesAtRange(int range)
     {
         List<HexTile> results = new List<HexTile>();
@@ -68,14 +69,22 @@ public class HexTile : MonoBehaviour
             for (int r = Mathf.Max(-range, -q - range); r <= Mathf.Min(range, -q + range); r++)
             {
                 int s = -q - r;
-                if (_grid.tiles.TryGetValue((q, r, s), out HexTile tile))
+                (int, int, int) key = HexCoordinates.HexAdd(coordinates, new HexCoordinates(q, r, s)).ToTuple();
+                if (_grid.tiles.TryGetValue(key, out HexTile tile))
                 {
                     results.Add(tile);
                 }
             }
         }
 
+        //Debug.Log($"Found {results.Count} tiles in range", this);
         return results;
+    }
+
+    // returns a list containing each HexTile that is at a distance between (inclusive) min and max from this tile
+    public List<HexTile> GetTilesAtRange(int min, int max)
+    {
+        throw new NotImplementedException();
     }
 
     // returns an array consisting of the coordinates of neighboring hexTiles
