@@ -80,11 +80,39 @@ public class HexTile : MonoBehaviour
         //Debug.Log($"Found {results.Count} tiles in range", this);
         return results;
     }
-
+    
     // returns a list containing each HexTile that is at a distance between (inclusive) min and max from this tile
-    public List<HexTile> GetTilesAtRange(int min, int max)
+    public List<HexTile> GetTilesAtRange(int minRange, int maxRange)
     {
-        throw new NotImplementedException();
+        List<HexTile> results = new List<HexTile>();
+        for (int q = -maxRange; q <= maxRange; q++)
+        {
+            int rMinOuter = Mathf.Max(-maxRange, -q - maxRange);
+            int rMaxOuter = Mathf.Min(maxRange, -q + maxRange);
+
+            int rMinInner = Mathf.Max(-minRange + 1, -q - minRange + 1);
+            int rMaxInner = Mathf.Min(minRange - 1, -q + minRange - 1);
+
+            for (int r = rMinOuter; r <= rMaxOuter; r++)
+            {
+                if (r >= rMinInner && r <= rMaxInner)
+                {
+                    continue;
+                }
+
+                int s = -q - r;
+                (int, int, int) key = HexCoordinates.HexAdd(coordinates, new HexCoordinates(q, r, s)).ToTuple();
+                if (_grid.tiles.TryGetValue(key, out HexTile tile))
+                {
+                    int distance = HexCoordinates.HexDistance(coordinates, new HexCoordinates(key));
+                    Debug.Assert(distance >= minRange && distance <= maxRange, $"Tile distance not within the bounds of {minRange}, {maxRange}, actual distance: {distance}", tile);
+                    results.Add(tile);
+                }
+            }
+        }
+
+        Debug.Log($"Found {results.Count} tiles in the range of {minRange} to {maxRange}", this);
+        return results;
     }
 
     // returns an array consisting of the coordinates of neighboring hexTiles
