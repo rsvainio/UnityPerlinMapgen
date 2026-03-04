@@ -128,8 +128,8 @@ public class MapGeneration
             GenerateElevationFeatures();
         }
 
-        GenerateMountainRanges();
         GenerateWaterBoundary();
+        GenerateMountainRanges();
 
         altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
         altitudeMap = DoCellularAutomataPass(altitudeMap, 0.7f, passes: 2); // mountain level cellular automata pass
@@ -179,28 +179,38 @@ public class MapGeneration
             int mountainRangeMaxLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.35f); // 35% of the map
             int mountainRangeMinLength = Mathf.RoundToInt(mountainRangeMaxLength * 0.5f);
             int maxAttempts = 10;
+            Dictionary<(int, int, int), float> mountainMask = new();
             Debug.Log($"Generating {mountainRangeCount} mountain ranges...");
             for (int i = 0; i < mountainRangeCount; i++)
             {
                 HexTile mountainRangeStart = grid.tilesArray[Random.Range(0, grid.tilesArray.Length)];
-                if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater) // terrains aren't actually set by this point so this doesn't work
+                List<HexTile> mountainPath = new();
+                if (altitudeMap[mountainRangeStart.coordinates.ToTuple()] <= grid.waterLevel)
                 {
                     i--;
                     continue;
                 }
 
                 HexTile mountainRangeEnd = null;
-                List<HexTile> validMountainRangeEnds = mountainRangeStart.GetTilesAtRange(mountainRangeMaxLength);
+                List<HexTile> validMountainRangeEnds = mountainRangeStart.GetTilesAtRange(mountainRangeMinLength, mountainRangeMaxLength - 1);
                 while (validMountainRangeEnds.Count > 0)
                 {
                     mountainRangeEnd = validMountainRangeEnds[Random.Range(0, validMountainRangeEnds.Count)];
-                    // the distance requirement is temporary
-                    //if (mountainRangeStart.terrain == TerrainTypes.ocean || mountainRangeStart.terrain == TerrainTypes.freshWater || HexCoordinates.HexDistance(mountainRangeStart, mountainRangeEnd) < mountainRangeMinLength)
-                    if (altitudeMap[mountainRangeStart.coordinates.ToTuple()] <= grid.waterLevel || HexCoordinates.HexDistance(mountainRangeStart, mountainRangeEnd) < mountainRangeMinLength)
+                    if (altitudeMap[mountainRangeStart.coordinates.ToTuple()] <= grid.waterLevel)
                     {
                         validMountainRangeEnds.Remove(mountainRangeEnd);
                         mountainRangeEnd = null;
                         continue;
+                    }
+                    else
+                    {
+                        // TODO: continue this by bending the path or altering it in some other way, as it currently just makes mountain ranges with the straightest paths possible
+                        // one way to do this would be to split the mountain range into multiple nodes that are varied along the range, and do pathfinding from each node to the next,
+                        // and then construct the mountain range from these smaller paths
+
+                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd);
+                        Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
+                        Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
                     }
                     break;
                 }
@@ -221,46 +231,34 @@ public class MapGeneration
                     }
                 }
 
-                // TODO: continue this by bending the path or altering it in some other way, as it currently just makes mountain ranges with the straightest paths possible
-                // one way to do this would be to split the mountain range into multiple nodes that are varied along the range, and do pathfinding from each node to the next,
-                // and then construct the mountain range from these smaller paths
-                List<HexTile> mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd);
-                Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points");
-
-                Dictionary<(int, int, int), float> mountainMask = new();
                 float mountainAge = Random.Range(0.0f, 1.0f);
                 float mountainWidth = mountainPath.Count * 0.15f * Mathf.Lerp(0.7f, 1.4f, mountainAge) * Random.Range(0.8f, 1.2f);
                 float mountainSteepness = Mathf.Lerp(1.75f, 1.25f, mountainAge);
                 Debug.Log($"Mountain range age: {mountainAge}, length: {mountainPath.Count}, tile range: {mountainWidth}");
                 foreach (HexTile tile in mountainPath)
                 {
-                    float range = mountainWidth * Random.Range(0.75f, 1.25f);
+                    float range = mountainWidth * Random.Range(0.5f, 1.5f);
                     foreach (HexTile tileInRange in tile.GetTilesAtRange(Mathf.RoundToInt(range)))
                     {
                         (int, int, int) key = tileInRange.coordinates.ToTuple();
                         float distanceFromMountain = HexCoordinates.HexDistance(tile, tileInRange) / range;
-                        //float newAltitude = Mathf.Clamp01(Mathf.Lerp(Mathf.Pow(altitudeMap[key], 0.5f - mountainAge / 2f), altitudeMap[key], distanceFromMountain * Random.Range(0.8f, 1.2f)));
-                        float newAltitude = Mathf.Clamp01(Mathf.Lerp(Random.Range(0.8f, 1f), altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
-                        if (mountainMask.ContainsKey(key))
-                        {
-                            mountainMask[key] = Mathf.Max(mountainMask[key], newAltitude);
-                        }
-                        else
-                        {
-                            mountainMask[key] = newAltitude;
-                        }
+                        //float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 2f);
+                        float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
+                        float newAltitude = Mathf.Clamp01(Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
+                        //mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
+                        mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                     }
                     //Debug.Log($"Old altitude: {altitudeMap[tile.coordinates.ToTuple()]}, new altitude: {mountainMask[tile.coordinates.ToTuple()]}", tile);
                     //tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", grid.testingColor);
                 }
 
-                foreach(KeyValuePair<(int, int, int), float> entry in mountainMask)
-                {
-                    altitudeMap[entry.Key] = entry.Value;
-                }
-
                 Debug.Log("Generated a mountain range from", mountainRangeStart);
                 Debug.Log("To", mountainRangeEnd);
+            }
+
+            foreach (KeyValuePair<(int, int, int), float> entry in mountainMask)
+            {
+                altitudeMap[entry.Key] = entry.Value;
             }
         }
 
