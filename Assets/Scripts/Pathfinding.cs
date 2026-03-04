@@ -24,6 +24,7 @@ public class Pathfinding
         List<HexTile> tilePath = new List<HexTile>();
         nodePath.ForEach(x => tilePath.Add(x.tile));
         ResetNodes();
+        Debug.Assert(tilePath[0] == startTile && tilePath[tilePath.Count - 1] == endTile, "Returned path mismatch with parameter tiles");
         return tilePath;
     }
 
@@ -41,7 +42,7 @@ public class Pathfinding
             if (current == endNode)
             {
                 // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
-                Debug.Log("Finished pathfinding", endNode.tile);
+                Debug.Log("Finished pathfinding", current.tile);
                 return ReconstructPath(endNode);
             }
 
@@ -77,18 +78,21 @@ public class Pathfinding
         return HexCoordinates.HexDistance(a.tile, b.tile);
     }
 
+    public static int RandomOrthogonalDirectionHeuristic(PathNode a, PathNode b)
+    {
+        float dot = Vector3.Dot(a.tile.coordinates.ToVec3(), b.tile.coordinates.ToVec3());
+        return dot > 1.0f ? UnityEngine.Random.Range(1, 10) : 11;
+    }
+
     private List<PathNode> ReconstructPath(PathNode endNode)
     {
         List<PathNode> path = new List<PathNode>();
-        path.Add(endNode);
-
         PathNode current = endNode;
-        while (current.cameFrom != null)
+        do
         {
-            (int, int, int) key = current.tile.coordinates.ToTuple();
-            path.Add(current.cameFrom);
+            path.Add(current);
             current = current.cameFrom;
-        }
+        } while (current != null);
 
         path.Reverse();
         return path;

@@ -208,7 +208,7 @@ public class MapGeneration
                         // one way to do this would be to split the mountain range into multiple nodes that are varied along the range, and do pathfinding from each node to the next,
                         // and then construct the mountain range from these smaller paths
 
-                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd);
+                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, Pathfinding.RandomOrthogonalDirectionHeuristic);
                         Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
                         Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
                     }
@@ -232,7 +232,8 @@ public class MapGeneration
                 }
 
                 float mountainAge = Random.Range(0.0f, 1.0f);
-                float mountainWidth = mountainPath.Count * 0.15f * Mathf.Lerp(0.7f, 1.4f, mountainAge) * Random.Range(0.8f, 1.2f);
+                int startToEndDistance = HexCoordinates.HexDistance(mountainPath[0], mountainPath[mountainPath.Count - 1]);
+                float mountainWidth = startToEndDistance * 0.15f * Mathf.Lerp(0.7f, 1.4f, mountainAge) * Random.Range(0.8f, 1.2f);
                 float mountainSteepness = Mathf.Lerp(1.75f, 1.25f, mountainAge);
                 Debug.Log($"Mountain range age: {mountainAge}, length: {mountainPath.Count}, tile range: {mountainWidth}");
                 foreach (HexTile tile in mountainPath)
@@ -245,11 +246,11 @@ public class MapGeneration
                         //float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 2f);
                         float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
                         float newAltitude = Mathf.Clamp01(Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
-                        //mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                         mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
+                        //mountainMask[key] = mountainMask.ContainsKey(key) ? (mountainMask[key] + newAltitude) / 2f : newAltitude;
                     }
                     //Debug.Log($"Old altitude: {altitudeMap[tile.coordinates.ToTuple()]}, new altitude: {mountainMask[tile.coordinates.ToTuple()]}", tile);
-                    //tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", grid.testingColor);
+                    tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", grid.testingColor);
                 }
 
                 Debug.Log("Generated a mountain range from", mountainRangeStart);
