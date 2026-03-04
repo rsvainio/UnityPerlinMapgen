@@ -180,6 +180,7 @@ public class MapGeneration
             int mountainRangeMinLength = Mathf.RoundToInt(mountainRangeMaxLength * 0.5f);
             int maxAttempts = 10;
             Dictionary<(int, int, int), float> mountainMask = new();
+            Dictionary<(int, int, int), float> mountainNoise = GenerateNoiseMap(scale: 5f, exponent: 2f);
             Debug.Log($"Generating {mountainRangeCount} mountain ranges...");
             for (int i = 0; i < mountainRangeCount; i++)
             {
@@ -242,17 +243,20 @@ public class MapGeneration
                     foreach (HexTile tileInRange in tile.GetTilesAtRange(Mathf.RoundToInt(range)))
                     {
                         (int, int, int) key = tileInRange.coordinates.ToTuple();
+                        float baseNoise = 1f - Mathf.Abs(mountainNoise[key] * 2f - 1f);
+                        float noiseStrength = Mathf.Lerp(0.4f, 0.1f, mountainAge);
+                        float noiseFactor = 1f + (baseNoise - 0.5f) * noiseStrength;
+
                         float distanceFromMountain = HexCoordinates.HexDistance(tile, tileInRange) / range;
-                        //float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 2f);
                         float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
                         float newAltitude = Mathf.Clamp01(Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
+                        newAltitude *= noiseFactor;
                         mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                         //mountainMask[key] = mountainMask.ContainsKey(key) ? (mountainMask[key] + newAltitude) / 2f : newAltitude;
                     }
                     //Debug.Log($"Old altitude: {altitudeMap[tile.coordinates.ToTuple()]}, new altitude: {mountainMask[tile.coordinates.ToTuple()]}", tile);
                     tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", grid.testingColor);
                 }
-
                 Debug.Log("Generated a mountain range from", mountainRangeStart);
                 Debug.Log("To", mountainRangeEnd);
             }
