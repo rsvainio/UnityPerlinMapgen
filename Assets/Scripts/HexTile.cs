@@ -7,10 +7,32 @@ public class HexTile : MonoBehaviour
 {
     public HexCoordinates coordinates { get; private set; }
     public string stringcoords { get; private set; }
-    public float altitude { get; set; }
-    public float temperature { get; set; }
-    public float precipitation { get; set; }
-    public TerrainType terrain { 
+    public float altitude
+    {
+        get { return _altitude; }
+        set 
+        {
+            SetTerrainAttribute(value, ref _altitude);
+        }
+    }
+    public float temperature
+    {
+        get { return _temperature; }
+        set
+        {
+            SetTerrainAttribute(value, ref _temperature);
+        }
+    }
+    public float precipitation
+    {
+        get { return _precipitation; }
+        set
+        {
+            SetTerrainAttribute(value, ref _precipitation);
+        }
+    }
+    public TerrainType terrain
+    { 
         get {  return _terrain; }
         set { _terrain = value; UpdateMovementCost(); }
     }
@@ -22,6 +44,9 @@ public class HexTile : MonoBehaviour
     }
 
     private HexGrid _grid;
+    private float _altitude;
+    private float _temperature;
+    private float _precipitation;
     private TerrainType _terrain;
     private HexTile[] _neighbors = null;
 
@@ -170,6 +195,15 @@ public class HexTile : MonoBehaviour
     private void UpdateMovementCost()
     {
         movementCost = _terrain.baseMovementCost;
+    }
+
+    private void SetTerrainAttribute(float newValue, ref float target)
+    {
+        if (newValue < 0 || newValue > 1)
+        {
+            Debug.LogWarning($"Set tile attribute value to {newValue}");
+        }
+        target = newValue;
     }
 }
 
