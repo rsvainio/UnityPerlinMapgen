@@ -78,10 +78,14 @@ public class Pathfinding
         return HexCoordinates.HexDistance(a.tile, b.tile);
     }
 
-    public static int RandomOrthogonalDirectionHeuristic(PathNode a, PathNode b)
+    public static int SmoothedRandomOrthogonalDirectionHeuristic(PathNode a, PathNode b)
     {
-        float dot = Vector3.Dot(a.tile.coordinates.ToVec3(), b.tile.coordinates.ToVec3());
-        return dot > 1.0f ? UnityEngine.Random.Range(1, 10) : 11;
+        Vector3 dirFrom = a.cameFrom != null ? a.tile.coordinates.ToVec3() - a.cameFrom.tile.coordinates.ToVec3() : a.tile.coordinates.ToVec3();
+        Vector3 dirTo = b.tile.coordinates.ToVec3() - a.tile.coordinates.ToVec3();
+        float dot = Vector2.Dot(dirFrom.normalized, dirTo.normalized);
+        float turnWeight = 4f;
+        int turnPenalty = Mathf.RoundToInt((1f - dot) * turnWeight);
+        return dot > 0f ? UnityEngine.Random.Range(1, 10) + turnPenalty : 11 + turnPenalty;
     }
 
     private List<PathNode> ReconstructPath(PathNode endNode)

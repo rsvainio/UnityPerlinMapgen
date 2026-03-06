@@ -196,25 +196,22 @@ public class MapGeneration
                 List<HexTile> validMountainRangeEnds = mountainRangeStart.GetTilesAtRange(mountainRangeMinLength, mountainRangeMaxLength - 1);
                 while (validMountainRangeEnds.Count > 0)
                 {
-                    mountainRangeEnd = validMountainRangeEnds[Random.Range(0, validMountainRangeEnds.Count)];
-                    if (altitudeMap[mountainRangeStart.coordinates.ToTuple()] <= grid.waterLevel)
+                    int j = Random.Range(0, validMountainRangeEnds.Count);
+                    mountainRangeEnd = validMountainRangeEnds[j];
+                    if (altitudeMap[mountainRangeEnd.coordinates.ToTuple()] > grid.waterLevel)
                     {
-                        validMountainRangeEnds.Remove(mountainRangeEnd);
-                        mountainRangeEnd = null;
-                        continue;
+                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, Pathfinding.SmoothedRandomOrthogonalDirectionHeuristic); // should test forbidding pathfinding through water tiles here to see if it makes mountains looke more natural
+                        Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
+                        Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
+                        break;
                     }
                     else
                     {
-                        // TODO: continue this by bending the path or altering it in some other way, as it currently just makes mountain ranges with the straightest paths possible
-                        // one way to do this would be to split the mountain range into multiple nodes that are varied along the range, and do pathfinding from each node to the next,
-                        // and then construct the mountain range from these smaller paths
-
-                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, Pathfinding.RandomOrthogonalDirectionHeuristic);
-                        Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
-                        Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
-                    }
-                    break;
+                        validMountainRangeEnds.RemoveAt(j);
+                        mountainRangeEnd = null;
+                    }                        
                 }
+
                 if (mountainRangeEnd == null) // failed to find a suitable endpoint to this mountain range
                 {
                     maxAttempts--;
@@ -249,8 +246,8 @@ public class MapGeneration
 
                         float distanceFromMountain = HexCoordinates.HexDistance(tile, tileInRange) / range;
                         float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
-                        float newAltitude = Mathf.Clamp01(Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
-                        newAltitude *= noiseFactor;
+                        float newAltitude = (Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
+                        newAltitude = Mathf.Clamp01(newAltitude * noiseFactor);
                         mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                         //mountainMask[key] = mountainMask.ContainsKey(key) ? (mountainMask[key] + newAltitude) / 2f : newAltitude;
                     }
