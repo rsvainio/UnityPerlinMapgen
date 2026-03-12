@@ -13,14 +13,13 @@ public class Pathfinding
         BuildNodeMap();
     }
 
-    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic = null, bool ignoreTerrain = false)
+    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, IPathFindingStrategy strategy = null)
     {
-        // if this is made to work with multiple PathNode layers then 
         PathNode startNode = _nodes[startTile.coordinates.ToTuple()];
         PathNode endNode = _nodes[endTile.coordinates.ToTuple()];
-        heuristic ??= CubeDistanceHeuristic;
+        strategy ??= new AStar();
 
-        List<PathNode> nodePath = A_star(startNode, endNode, heuristic, ignoreTerrain);
+        List<PathNode> nodePath = DoPathfinding(startNode, endNode, strategy);
         List<HexTile> tilePath = new List<HexTile>();
         if (nodePath.Count > 0)
         {
@@ -31,33 +30,32 @@ public class Pathfinding
         return tilePath;
     }
 
-    private List<PathNode> A_star(PathNode startNode, PathNode endNode, Func<PathNode, PathNode, int> heuristic, bool ignoreTerrain = false)
+    private List<PathNode> DoPathfinding(PathNode startNode, PathNode goal, IPathFindingStrategy strategy)
     {
         Debug.Log("Starting pathfinding...", startNode.tile);
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
         openSet.Insert(startNode);
         startNode.gScore = 0;
-        startNode.hScore = heuristic(startNode, endNode);
+        startNode.hScore = strategy.Heuristic(startNode, goal);
 
         while (openSet.Count > 0)
         {
             PathNode current = openSet.ExtractFirst();
-            if (current == endNode)
+            if (strategy.IsGoal(current, goal))
             {
                 // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
                 Debug.Log("Finished pathfinding", current.tile);
-                return ReconstructPath(endNode);
+                return ReconstructPath(goal);
             }
 
             foreach (PathNode neighbor in GetNeighbors(current))
             {
-                int moveCost = ignoreTerrain ? 1 : neighbor.movementCost;
-                moveCost += current.gScore;
+                float moveCost = strategy.StepCost(current, neighbor);
                 if (moveCost < neighbor.gScore)
                 {
                     neighbor.cameFrom = current;
                     neighbor.gScore = moveCost;
-                    neighbor.hScore = heuristic(neighbor, endNode);
+                    neighbor.hScore = strategy.Heuristic(neighbor, goal);
 
                     if (!openSet.Contains(neighbor))
                     {
@@ -72,24 +70,8 @@ public class Pathfinding
         }
 
         Debug.LogWarning("Failed to find a valid path from tile:", startNode.tile);
-        Debug.LogWarning("Target tile:", endNode.tile);
+        Debug.LogWarning("Target tile:", goal.tile);
         return new List<PathNode>(); // failed to find a valid path from startNode to endNode
-    }
-
-    // different heuristic functions could be collected into a static class or something like that
-    public static int CubeDistanceHeuristic(PathNode a, PathNode b)
-    {
-        return HexCoordinates.HexDistance(a.tile, b.tile);
-    }
-
-    public static int SmoothedRandomOrthogonalDirectionHeuristic(PathNode a, PathNode b)
-    {
-        Vector3 dirFrom = a.cameFrom != null ? a.tile.coordinates.ToVec3() - a.cameFrom.tile.coordinates.ToVec3() : a.tile.coordinates.ToVec3();
-        Vector3 dirTo = b.tile.coordinates.ToVec3() - a.tile.coordinates.ToVec3();
-        float dot = Vector2.Dot(dirFrom.normalized, dirTo.normalized);
-        float turnWeight = 4f;
-        int turnPenalty = Mathf.RoundToInt((1f - dot) * turnWeight);
-        return dot > 0f ? UnityEngine.Random.Range(1, 10) + turnPenalty : 11 + turnPenalty;
     }
 
     private List<PathNode> ReconstructPath(PathNode endNode)
@@ -135,7 +117,6 @@ public class Pathfinding
         }
     }
 
-    // TODO: implement this
     private void BuildNodeMap()
     {
         foreach(KeyValuePair<(int, int, int), HexTile> entry in _grid.tiles)
@@ -156,10 +137,10 @@ public class PathNode : IHeapItem<PathNode>
 
     // A* properties
     public PathNode cameFrom { get; set; } = null;
-    public int gScore { get; set; } = int.MaxValue; // the cost of the cheapest known path from start to this node
-    public int hScore { get; set; } = 0; // this node's heuristic score, which naturally depends on the heuristic function used
-    public int fScore => gScore + hScore; // the best guess as to how cheap a path from start to finish could be, if it passes through this node
-    public int movementCost { get; private set; } // equal to the underlying HexTile's terrain movement cost, if no HexTile is present likely a calculated average of all the movement costs of this PathNode's HexTiles
+    public float gScore { get; set; } = int.MaxValue; // the cost of the cheapest known path from start to this node
+    public float hScore { get; set; } = 0; // this node's heuristic score, which naturally depends on the heuristic function used
+    public float fScore => gScore + hScore; // the best guess as to how cheap a path from start to finish could be, if it passes through this node
+    public float movementCost { get; private set; } // equal to the underlying HexTile's terrain movement cost, if no HexTile is present likely a calculated average of all the movement costs of this PathNode's HexTiles
 
     public PathNode(HexTile tile)
     {
@@ -181,5 +162,77 @@ public class PathNode : IHeapItem<PathNode>
         }
 
         return -compare; // inverted since the heap implementation is a max heap, this should really be handled in the heap instead
+    }
+}
+
+public interface IPathFindingStrategy
+{
+    float Heuristic(PathNode current, PathNode goal);
+    float StepCost(PathNode current, PathNode neighbor);
+    bool IsGoal(PathNode current, PathNode goal);
+}
+
+public class AStar : IPathFindingStrategy
+{
+    public virtual float Heuristic(PathNode current, PathNode goal)
+    {
+        return HexCoordinates.HexDistance(current.tile, goal.tile);
+    }
+
+    public virtual float StepCost(PathNode current, PathNode neighbor)
+    {
+        return current.gScore + neighbor.movementCost;
+    }
+
+    public virtual bool IsGoal(PathNode current, PathNode goal)
+    {
+        return current.tile == goal.tile;
+    }
+}
+
+public class Dijkstra : AStar
+{
+    public override float Heuristic(PathNode current, PathNode goal)
+    {
+        return 0;
+    }
+}
+
+public class AsTheCrowFlies : AStar
+{
+    public override float StepCost(PathNode current, PathNode neighbor)
+    {
+        return 1;
+    }
+}
+
+public class MountainStrategy : AStar
+{
+    public override float StepCost(PathNode current, PathNode goal)
+    {
+        Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : current.tile.coordinates.ToVec3();
+        Vector3 dirTo = goal.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
+        float dot = Vector2.Dot(dirFrom.normalized, dirTo.normalized);
+        float turnWeight = 4f;
+        int turnPenalty = Mathf.RoundToInt((1f - dot) * turnWeight);
+        return dot > 0f ? UnityEngine.Random.Range(1, 10) + turnPenalty : 11 + turnPenalty;
+    }
+}
+
+public class BreadthFirst : IPathFindingStrategy
+{
+    public float Heuristic(PathNode current, PathNode goal)
+    {
+        throw new NotImplementedException();
+    }
+
+    public float StepCost(PathNode current, PathNode neighbor)
+    {
+        throw new NotImplementedException();
+    }
+
+    public bool IsGoal(PathNode current, PathNode goal)
+    {
+        throw new NotImplementedException();
     }
 }
