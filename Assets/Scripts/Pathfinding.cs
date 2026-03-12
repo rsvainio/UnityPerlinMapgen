@@ -13,22 +13,25 @@ public class Pathfinding
         BuildNodeMap();
     }
 
-    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic = null)
+    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, Func<PathNode, PathNode, int> heuristic = null, bool ignoreTerrain = false)
     {
         // if this is made to work with multiple PathNode layers then 
         PathNode startNode = _nodes[startTile.coordinates.ToTuple()];
         PathNode endNode = _nodes[endTile.coordinates.ToTuple()];
         heuristic ??= CubeDistanceHeuristic;
 
-        List<PathNode> nodePath = A_star(startNode, endNode, heuristic);
+        List<PathNode> nodePath = A_star(startNode, endNode, heuristic, ignoreTerrain);
         List<HexTile> tilePath = new List<HexTile>();
-        nodePath.ForEach(x => tilePath.Add(x.tile));
+        if (nodePath.Count > 0)
+        {
+            nodePath.ForEach(x => tilePath.Add(x.tile));
+            Debug.Assert(tilePath[0] == startTile && tilePath[tilePath.Count - 1] == endTile, "Returned path mismatch with parameter tiles");
+        }
         ResetNodes();
-        Debug.Assert(tilePath[0] == startTile && tilePath[tilePath.Count - 1] == endTile, "Returned path mismatch with parameter tiles");
         return tilePath;
     }
 
-    private List<PathNode> A_star(PathNode startNode, PathNode endNode, Func<PathNode, PathNode, int> heuristic)
+    private List<PathNode> A_star(PathNode startNode, PathNode endNode, Func<PathNode, PathNode, int> heuristic, bool ignoreTerrain = false)
     {
         Debug.Log("Starting pathfinding...", startNode.tile);
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
@@ -48,7 +51,8 @@ public class Pathfinding
 
             foreach (PathNode neighbor in GetNeighbors(current))
             {
-                int moveCost = current.gScore + neighbor.movementCost;
+                int moveCost = ignoreTerrain ? 1 : neighbor.movementCost;
+                moveCost += current.gScore;
                 if (moveCost < neighbor.gScore)
                 {
                     neighbor.cameFrom = current;
@@ -142,8 +146,8 @@ public class Pathfinding
 }
 
 // this could be made more efficient by making it work in layers of decreasing coarseness: first layer
-// consists of nodes which cover a lot of tiles, then when the most efficient path through these large nodes is calculated,
-// calculate the most efficient path in the smaller nodes, and so on until you have a path consisting of actual tiles
+// consists of nodes which cover a lot of tiles; when the most efficient path through these large nodes is calculated
+// calculate the most efficient path in the smaller nodes, and repeat until you have a path consisting of actual tiles
 public class PathNode : IHeapItem<PathNode>
 {
     public HexTile tile { get; }
@@ -155,7 +159,7 @@ public class PathNode : IHeapItem<PathNode>
     public int gScore { get; set; } = int.MaxValue; // the cost of the cheapest known path from start to this node
     public int hScore { get; set; } = 0; // this node's heuristic score, which naturally depends on the heuristic function used
     public int fScore => gScore + hScore; // the best guess as to how cheap a path from start to finish could be, if it passes through this node
-    public int movementCost { get; private set; } // equal to the underlying HexTile's terrain movement cost, if no HexTile is present likely a calculated average of all the movement costs of this PathNode's HexTiles 
+    public int movementCost { get; private set; } // equal to the underlying HexTile's terrain movement cost, if no HexTile is present likely a calculated average of all the movement costs of this PathNode's HexTiles
 
     public PathNode(HexTile tile)
     {

@@ -16,7 +16,7 @@ namespace Terrain
             public Color baseColor;
         [Header("Gameplay")]
             public int baseMovementCost;
-            //public bool isWalkable;
+            public bool isWalkable = true;
         [Header("Rules")]
             public TerrainRule[] rules;
 

@@ -201,15 +201,15 @@ public class MapGeneration
                     if (altitudeMap[mountainRangeEnd.coordinates.ToTuple()] > grid.waterLevel)
                     {
                         mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, Pathfinding.SmoothedRandomOrthogonalDirectionHeuristic); // should test forbidding pathfinding through water tiles here to see if it makes mountains looke more natural
-                        Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
-                        Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
-                        break;
+                        if (mountainPath.Count > 0)
+                        {
+                            Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
+                            Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
+                            break;
+                        }
                     }
-                    else
-                    {
-                        validMountainRangeEnds.RemoveAt(j);
-                        mountainRangeEnd = null;
-                    }                        
+                    validMountainRangeEnds.RemoveAt(j);
+                    mountainRangeEnd = null;
                 }
 
                 if (mountainRangeEnd == null) // failed to find a suitable endpoint to this mountain range
