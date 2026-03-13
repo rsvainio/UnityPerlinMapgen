@@ -12,7 +12,7 @@ namespace Terrain.TerrainRules
             [Range(1, 10)] public int range = 1;
             [Tooltip("The number of tiles from the list of terrains that are required for this rule to return true")]
             [Range(1, 10)] public int tilesRequired = 1;
-            [Tooltip("Invert the rule so that it returns false if the required amount of terrains are within range")] // fix
+            [Tooltip("Invert the rule so that it returns false if the required amount of terrains are within range")]
             public bool inverted = false;
 
         public override bool MatchesRule(HexTile tile)

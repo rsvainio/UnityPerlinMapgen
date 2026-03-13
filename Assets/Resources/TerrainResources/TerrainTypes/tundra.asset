@@ -20,3 +20,4 @@ MonoBehaviour:
   baseMovementCost: 1
   rules:
   - {fileID: 11400000, guid: 7c413a33c8be3bb4ba98ec99f5fb0bf7, type: 2}
+  - {fileID: 11400000, guid: ddc0bfe8bb2fab842a0de4cfd09ad491, type: 2}

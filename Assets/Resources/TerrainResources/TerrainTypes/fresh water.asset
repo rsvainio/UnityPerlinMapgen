@@ -18,5 +18,6 @@ MonoBehaviour:
   displayName: Fresh Water
   baseColor: {r: 0.28230685, g: 0.78746605, b: 0.9811321, a: 0}
   baseMovementCost: 1
+  isWalkable: 0
   rules:
   - {fileID: 11400000, guid: cc99b64eee693974b8faa5a5f32ad5a3, type: 2}
