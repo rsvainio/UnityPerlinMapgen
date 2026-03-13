@@ -48,7 +48,7 @@ public class Pathfinding
                 return ReconstructPath(goal);
             }
 
-            foreach (PathNode neighbor in GetNeighbors(current))
+            foreach (PathNode neighbor in current.neighbors)
             {
                 float moveCost = strategy.StepCost(current, neighbor);
                 if (moveCost < neighbor.gScore)
@@ -88,25 +88,6 @@ public class Pathfinding
         return path;
     }
 
-    // this would currently not work with a multilayer PathNode implementation as it uses HexTile coordinates
-    private List<PathNode> GetNeighbors(PathNode node)
-    {
-        if (node.neighbors != null) { return node.neighbors; }
-
-        List<PathNode> neighbors = new List<PathNode>();
-        HexCoordinates[] neighborCoordinates = HexMetrics.neighborVectors;
-        for (int i = 0; i < neighborCoordinates.Length; i++)
-        {
-            if (_nodes.TryGetValue(neighborCoordinates[i].HexAdd(node.tile.coordinates).ToTuple(), out PathNode newNode))
-            {
-                neighbors.Add(newNode);
-            }
-        }
-        
-        node.neighbors = neighbors;
-        return neighbors;
-    }
-
     private void ResetNodes()
     {
         foreach (PathNode node in _nodes.Values)
@@ -119,9 +100,22 @@ public class Pathfinding
 
     private void BuildNodeMap()
     {
-        foreach(KeyValuePair<(int, int, int), HexTile> entry in _grid.tiles)
+        // construct a PathNode for each HexTile in the HexGrid
+        foreach (KeyValuePair<(int, int, int), HexTile> entry in _grid.tiles)
         {
             _nodes.Add(entry.Key, new PathNode(entry.Value));
+        }
+
+        // calculate the neighbors for each PathNode
+        foreach (PathNode node in _nodes.Values)
+        {
+            PathNode[] neighbors = new PathNode[node.tile.neighbors.Length];
+            for (int i = 0; i < neighbors.Length; i++)
+            {
+                neighbors[i] = _nodes[node.tile.neighbors[i].coordinates.ToTuple()];
+            }
+
+            node.neighbors = neighbors;
         }
     }
 }
@@ -133,7 +127,7 @@ public class PathNode : IHeapItem<PathNode>
 {
     public HexTile tile { get; }
     public int heapIndex { get; set; }
-    public List<PathNode> neighbors { get; set; }
+    public PathNode[] neighbors { get; set; }
 
     // A* properties
     public PathNode cameFrom { get; set; } = null;
