@@ -10,26 +10,17 @@ public class HexTile : MonoBehaviour
     public float altitude
     {
         get { return _altitude; }
-        set 
-        {
-            SetTerrainAttribute(value, ref _altitude);
-        }
+        set { SetTerrainAttribute(value, ref _altitude); }
     }
     public float temperature
     {
         get { return _temperature; }
-        set
-        {
-            SetTerrainAttribute(value, ref _temperature);
-        }
+        set { SetTerrainAttribute(value, ref _temperature); }
     }
     public float precipitation
     {
         get { return _precipitation; }
-        set
-        {
-            SetTerrainAttribute(value, ref _precipitation);
-        }
+        set { SetTerrainAttribute(value, ref _precipitation); }
     }
     public TerrainType terrain
     { 
@@ -201,9 +192,9 @@ public class HexTile : MonoBehaviour
     {
         if (newValue < 0 || newValue > 1)
         {
-            Debug.LogWarning($"Set tile attribute value to {newValue}");
+            Debug.LogWarning($"Attempted to set tile attribute value to {newValue}");
         }
-        target = newValue;
+        target = Mathf.Clamp01(newValue);
     }
 }
 
