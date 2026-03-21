@@ -131,45 +131,16 @@ public class HexTile : MonoBehaviour
         return results;
     }
 
-    // returns an array consisting of the coordinates of neighboring hexTiles
-    // since the class has no knowledge of the boundaries of the map, there's a chance of returning coordinates that don't correspond to any actual hexTiles
-    public HexCoordinates[] GetNeighborCoordinates()
-    {
-        HexCoordinates[] neighborCoordinates;
-
-        if (_neighbors == null)
-        {
-            HexCoordinates[] vectors = HexMetrics.neighborVectors;
-            neighborCoordinates = new HexCoordinates[vectors.Length];
-
-            for (int i = 0; i < vectors.Length; i++)
-            {
-                neighborCoordinates[i] = coordinates.HexAdd(vectors[i]);
-            }
-        }
-        else
-        {
-            neighborCoordinates = new HexCoordinates[_neighbors.Length];
-
-            for (int i = 0; i < _neighbors.Length; i++)
-            {
-                neighborCoordinates[i] = _neighbors[i].coordinates;
-            }
-        }
-
-        return neighborCoordinates;
-    }
-
-    // returns an array of references to this tile's neighbors and builds the said list of neighbors if it's null at call time
+    // returns an array of references to this tile's neighbors
     private HexTile[] GetNeighbors()
     {
-        HexCoordinates[] neighborCoordinates = GetNeighborCoordinates(); // TODO: there is no reason to separately fetch the coordinates, remove this
-        _neighbors = new HexTile[neighborCoordinates.Length];
+        _neighbors = new HexTile[6]; // assume 6 neighbours
         int j = 0;
 
         for (int i = 0; i < _neighbors.Length; i++)
         {
-            if (_grid.tiles.TryGetValue(neighborCoordinates[i].ToTuple(), out HexTile tile))
+            (int, int, int) key = coordinates.HexAdd(HexMetrics.neighborVectors[i]).ToTuple();
+            if (_grid.tiles.TryGetValue(key, out HexTile tile))
             {
                 _neighbors[i - j] = tile;
             }
@@ -179,7 +150,7 @@ public class HexTile : MonoBehaviour
             }
         }
 
-        Array.Resize(ref _neighbors, _neighbors.Length - j);
+        Array.Resize(ref _neighbors, _neighbors.Length - j); // resize the array to the actual number of neighbours
         return _neighbors;
     }
 
