@@ -200,7 +200,7 @@ public class MapGeneration
                     mountainRangeEnd = validMountainRangeEnds[j];
                     if (altitudeMap[mountainRangeEnd.coordinates.ToTuple()] > grid.waterLevel)
                     {
-                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, Pathfinding.SmoothedRandomOrthogonalDirectionHeuristic); // should test forbidding pathfinding through water tiles here to see if it makes mountains looke more natural
+                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, strategy: new MountainStrategy(new TerrainType[] {TerrainTypes.ocean, TerrainTypes.freshWater})); // should test forbidding pathfinding through water tiles here to see if it makes mountains looke more natural
                         if (mountainPath.Count > 0)
                         {
                             Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
@@ -607,7 +607,7 @@ public class MapGeneration
         }
 
         // TODO: handle the edge case where lakes can intersect a river and split it in two
-        //       this isn't necessarily a bug but the split-off part of the river needs to be assigned into a new river list
+        //       this isn't necessarily an unwanted interaction but the split-off part of the river needs to be assigned to a new river list
         List<HexTile> BuildLake(List<HexTile> river)
         {
             Debug.Log("Attempting to create a lake from a river...", river[0]);
@@ -733,17 +733,27 @@ public class MapGeneration
         Debug.Log("Starting ocean mapping...");
         foreach (HexTile tile in grid.borderTiles)
         {
-            DoOceanMappingRecursion(tile);
-        }
-
-        void DoOceanMappingRecursion(HexTile tile)
-        {
             if (tile.altitude <= grid.waterLevel && tile.terrain != TerrainTypes.ocean)
             {
-                tile.terrain = TerrainTypes.ocean;
+                DoOceanMapping(tile);
+            }
+        }
+
+        void DoOceanMapping(HexTile start)
+        {
+            Queue<HexTile> queue = new Queue<HexTile>();
+            start.terrain = TerrainTypes.ocean;
+            queue.Enqueue(start);
+            while (queue.Count > 0)
+            {
+                HexTile tile = queue.Dequeue();
                 foreach (HexTile neighborTile in tile.neighbors)
                 {
-                    DoOceanMappingRecursion(neighborTile);
+                    if (neighborTile.altitude <= grid.waterLevel && neighborTile.terrain != TerrainTypes.ocean)
+                    {
+                        neighborTile.terrain = TerrainTypes.ocean;
+                        queue.Enqueue(neighborTile);
+                    }
                 }
             }
         }
