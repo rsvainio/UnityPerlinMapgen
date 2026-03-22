@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Terrain;
 using UnityEngine;
 
 public class Pathfinding
@@ -50,6 +52,11 @@ public class Pathfinding
 
             foreach (PathNode neighbor in current.neighbors)
             {
+                if (strategy.forbiddenTerrains.Contains(neighbor.tile.terrain)) 
+                {
+                    continue;
+                }
+
                 float moveCost = strategy.StepCost(current, neighbor);
                 if (moveCost < neighbor.gScore)
                 {
@@ -78,11 +85,11 @@ public class Pathfinding
     {
         List<PathNode> path = new List<PathNode>();
         PathNode current = endNode;
-        do
+        while (current != null)
         {
             path.Add(current);
             current = current.cameFrom;
-        } while (current != null);
+        }
 
         path.Reverse();
         return path;
@@ -161,6 +168,8 @@ public class PathNode : IHeapItem<PathNode>
 
 public interface IPathFindingStrategy
 {
+    TerrainType[] forbiddenTerrains { get; set; }
+
     float Heuristic(PathNode current, PathNode goal);
     float StepCost(PathNode current, PathNode neighbor);
     bool IsGoal(PathNode current, PathNode goal);
@@ -168,6 +177,13 @@ public interface IPathFindingStrategy
 
 public class AStar : IPathFindingStrategy
 {
+    public TerrainType[] forbiddenTerrains { get; set; }
+
+    public AStar(TerrainType[] forbiddenTerrains = null)
+    {
+        this.forbiddenTerrains = forbiddenTerrains;
+    }
+
     public virtual float Heuristic(PathNode current, PathNode goal)
     {
         return HexCoordinates.HexDistance(current.tile, goal.tile);
@@ -202,19 +218,28 @@ public class AsTheCrowFlies : AStar
 
 public class MountainStrategy : AStar
 {
-    public override float StepCost(PathNode current, PathNode goal)
+    public MountainStrategy(TerrainType[] forbiddenTerrains) : base(forbiddenTerrains) { }
+    private Dictionary<PathNode, float> _nodeNoises = new(); // the cost function needs to be deterministic so keep a single noise value for each tile
+
+    public override float StepCost(PathNode current, PathNode neighbor)
     {
+        if (!_nodeNoises.ContainsKey(neighbor))
+        {
+            _nodeNoises[neighbor] = UnityEngine.Random.Range(0, 5);
+        }
+
         Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : current.tile.coordinates.ToVec3();
-        Vector3 dirTo = goal.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
-        float dot = Vector2.Dot(dirFrom.normalized, dirTo.normalized);
-        float turnWeight = 4f;
-        int turnPenalty = Mathf.RoundToInt((1f - dot) * turnWeight);
-        return dot > 0f ? UnityEngine.Random.Range(1, 10) + turnPenalty : 11 + turnPenalty;
+        Vector3 dirTo = neighbor.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
+        float dot = Vector3.Dot(dirFrom.normalized, dirTo.normalized);
+
+        return dot > 0f ? _nodeNoises[neighbor] : 10;
     }
 }
 
 public class BreadthFirst : IPathFindingStrategy
 {
+    public TerrainType[] forbiddenTerrains { get; set; }
+
     public float Heuristic(PathNode current, PathNode goal)
     {
         throw new NotImplementedException();
