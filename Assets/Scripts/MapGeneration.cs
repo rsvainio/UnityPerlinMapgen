@@ -899,41 +899,63 @@ public class MapGeneration
     
     public void ConsolidateTerrains()
     {
-        TerrainType[] newTerrains = new TerrainType[grid.tilesArray.Length];
-        for (int i = 0; i < grid.tilesArray.Length; i++)
+        List<HexTile> tilesToReassign = new List<HexTile>();
+        foreach (HexTile tile in grid.tilesArray)
         {
-            HexTile tile = grid.tilesArray[i];
-            newTerrains[i] = tile.terrain;
-            Dictionary<TerrainType, int> neighborTerrains = new Dictionary<TerrainType, int>();
+            if (tile.terrain != TerrainTypes.ocean && tile.terrain != TerrainTypes.freshWater)
+            {
+                int ownTerrainNeighbors = 0;
+                foreach (HexTile neighbor in tile.neighbors)
+                {
+                    if (neighbor.terrain == tile.terrain)
+                    {
+                        ownTerrainNeighbors++;
+                    }
+                }
+                if (ownTerrainNeighbors <= 3)
+                {
+                    tilesToReassign.Add(tile);
+                }
+            }
+        }
+
+        TerrainType[] newTerrains = new TerrainType[tilesToReassign.Count];
+        for (int i = 0; i < tilesToReassign.Count; i++)
+        {
+            HexTile tile = tilesToReassign[i];
+            Dictionary<TerrainType, int> neighborTerrains = new Dictionary<TerrainType, int>(6);
             foreach (HexTile neighbor in tile.neighbors)
             {
                 neighborTerrains.TryGetValue(neighbor.terrain, out int n);
                 neighborTerrains[neighbor.terrain] = n + 1;
             }
-            int requiredTerrainNumber = 4;
+            int requiredTerrainNumber = 0;
+            List<TerrainType> candidates = new List<TerrainType>(6);
             foreach (KeyValuePair<TerrainType, int> entry in neighborTerrains)
             {
-                if (entry.Value > requiredTerrainNumber)
+                if (entry.Value > requiredTerrainNumber) // clear any previous TerrainTypes in the candidate list
                 {
-                    newTerrains[i] = entry.Key;
+                    requiredTerrainNumber = entry.Value;
+                    candidates.Clear();
+                    candidates.Add(entry.Key);
+                }
+                else if (entry.Value == requiredTerrainNumber) // add the TerrainType to the candidates list in a draw
+                {
+                    candidates.Add(entry.Key);
                 }
             }
+            newTerrains[i] = candidates[Random.Range(0, candidates.Count)]; // select a random TerrainType from all the candidates
         }
 
-        for (int i = 0; i < grid.tilesArray.Length; i++)
+        for (int i = 0; i < tilesToReassign.Count; i++)
         {
             TerrainType newTerrain = newTerrains[i];
-            if (newTerrain == TerrainTypes.ocean || newTerrain == TerrainTypes.freshWater)
+            if (newTerrain != TerrainTypes.ocean && newTerrain != TerrainTypes.freshWater)
             {
-                continue;
-            }
-
-            HexTile tile = grid.tilesArray[i];
-            if (tile.terrain != newTerrain)
-            {
+                HexTile tile = tilesToReassign[i];
                 tile.terrain = newTerrain;
                 tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", newTerrain.baseColor);
-            }   
+            }
         }
     }
 }
