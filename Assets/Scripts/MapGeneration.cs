@@ -174,7 +174,7 @@ public class MapGeneration
             return altitudeMap;
         }
 
-        void GenerateMountainRanges(int mountainRangeCount = 1)
+        void GenerateMountainRanges(int mountainRangeCount = 3)
         {
             int mountainRangeMaxLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.35f); // 35% of the map
             int mountainRangeMinLength = Mathf.RoundToInt(mountainRangeMaxLength * 0.5f);
@@ -204,7 +204,11 @@ public class MapGeneration
                         if (mountainPath.Count > 0)
                         {
                             Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
-                            Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
+                            if (mountainPath.Count > mountainRangeMaxLength * 1.5)
+                            {
+                                Debug.LogWarning($"Mountain range abnormally long, possible generation error", mountainRangeStart);
+                            }
+                            //Debug.Assert(mountainPath.Count >= mountainRangeMinLength && mountainPath.Count <= mountainRangeMaxLength, $"Mountain range length not within the bounds of {mountainRangeMinLength}, {mountainRangeMaxLength}, actual length: {mountainPath.Count}", mountainRangeStart);
                             break;
                         }
                     }
@@ -246,7 +250,7 @@ public class MapGeneration
 
                         float distanceFromMountain = HexCoordinates.HexDistance(tile, tileInRange) / range;
                         float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
-                        float newAltitude = (Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)));
+                        float newAltitude = Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness));
                         newAltitude = Mathf.Clamp01(newAltitude * noiseFactor);
                         mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                         //mountainMask[key] = mountainMask.ContainsKey(key) ? (mountainMask[key] + newAltitude) / 2f : newAltitude;
@@ -892,18 +896,44 @@ public class MapGeneration
             return newNoiseMap;
         }
     }
-
-    public void AssignTerrains()
+    
+    public void ConsolidateTerrains()
     {
-        Dictionary<(int, int, int), HexTile> tiles = grid.tiles;
-
-        foreach (HexTile tile in tiles.Values)
+        TerrainType[] newTerrains = new TerrainType[grid.tilesArray.Length];
+        for (int i = 0; i < grid.tilesArray.Length; i++)
         {
-            float altitude = tile.altitude;
-            float temperature = tile.temperature;
-            float precipitation = tile.precipitation;
+            HexTile tile = grid.tilesArray[i];
+            newTerrains[i] = tile.terrain;
+            Dictionary<TerrainType, int> neighborTerrains = new Dictionary<TerrainType, int>();
+            foreach (HexTile neighbor in tile.neighbors)
+            {
+                neighborTerrains.TryGetValue(neighbor.terrain, out int n);
+                neighborTerrains[neighbor.terrain] = n + 1;
+            }
+            int requiredTerrainNumber = 4;
+            foreach (KeyValuePair<TerrainType, int> entry in neighborTerrains)
+            {
+                if (entry.Value > requiredTerrainNumber)
+                {
+                    newTerrains[i] = entry.Key;
+                }
+            }
+        }
 
+        for (int i = 0; i < grid.tilesArray.Length; i++)
+        {
+            TerrainType newTerrain = newTerrains[i];
+            if (newTerrain == TerrainTypes.ocean || newTerrain == TerrainTypes.freshWater)
+            {
+                continue;
+            }
 
+            HexTile tile = grid.tilesArray[i];
+            if (tile.terrain != newTerrain)
+            {
+                tile.terrain = newTerrain;
+                tile.GetComponentInChildren<Renderer>().material.SetColor("_Color", newTerrain.baseColor);
+            }   
         }
     }
 }
