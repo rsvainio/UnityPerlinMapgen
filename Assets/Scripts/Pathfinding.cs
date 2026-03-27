@@ -36,6 +36,7 @@ public class Pathfinding
     {
         Debug.Log("Starting pathfinding...", startNode.tile);
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
+        Dictionary<PathNode, bool> closedSet = new Dictionary<PathNode, bool>(_grid.width * _grid.height);
         openSet.Insert(startNode);
         startNode.gScore = 0;
         startNode.hScore = strategy.Heuristic(startNode, goal);
@@ -43,6 +44,7 @@ public class Pathfinding
         while (openSet.Count > 0)
         {
             PathNode current = openSet.ExtractFirst();
+            closedSet[current] = true;
             if (strategy.IsGoal(current, goal))
             {
                 // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
@@ -52,7 +54,7 @@ public class Pathfinding
 
             foreach (PathNode neighbor in current.neighbors)
             {
-                if (strategy.forbiddenTerrains.Contains(neighbor.tile.terrain)) 
+                if (closedSet.ContainsKey(neighbor) || strategy.forbiddenTerrains.Contains(neighbor.tile.terrain)) 
                 {
                     continue;
                 }
@@ -181,7 +183,7 @@ public class AStar : IPathFindingStrategy
 
     public AStar(TerrainType[] forbiddenTerrains = null)
     {
-        this.forbiddenTerrains = forbiddenTerrains;
+        this.forbiddenTerrains = forbiddenTerrains ?? new TerrainType[0];
     }
 
     public virtual float Heuristic(PathNode current, PathNode goal)
@@ -228,11 +230,59 @@ public class MountainStrategy : AStar
             _nodeNoises[neighbor] = UnityEngine.Random.Range(0, 5);
         }
 
-        Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : current.tile.coordinates.ToVec3();
+        Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : Vector3.zero;
         Vector3 dirTo = neighbor.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
         float dot = Vector3.Dot(dirFrom.normalized, dirTo.normalized);
 
         return dot > 0f ? _nodeNoises[neighbor] : 10;
+    }
+}
+
+public class RiverStrategy : IPathFindingStrategy
+{
+    public TerrainType[] forbiddenTerrains { get; set; }
+
+    public RiverStrategy(MapGeneration mapGen, TerrainType[] forbiddenTerrains = null)
+    {
+        _mapGen = mapGen;
+        this.forbiddenTerrains = forbiddenTerrains ?? new TerrainType[0];
+    }
+
+    private MapGeneration _mapGen;
+
+    public float Heuristic(PathNode current, PathNode goal)
+    {
+        //return 1f;
+        return _mapGen.oceanDistanceMap[current.tile.coordinates.ToTuple()] * 0.2f;
+    }
+
+    // strongly penalise going uphill
+    public float StepCost(PathNode current, PathNode neighbor)
+    {
+        float heightDifference = neighbor.tile.altitude - current.tile.altitude;
+        float cost = 1f;
+
+        if (heightDifference > 0)
+        {
+            cost += heightDifference * 10f;
+        }
+        else
+        {
+            cost += heightDifference;
+        }
+
+        Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : Vector3.zero;
+        Vector3 dirTo = neighbor.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
+        float alignment = Vector3.Dot(dirFrom.normalized, dirTo.normalized);
+        cost -= alignment * 0.2f;
+
+        return Mathf.Max(0.1f, cost);
+    }
+
+    // TODO: figure out a way to implement an early-exit here, as currently it causes rivers generated with this strategy to go across each other and to travel through water bodies
+    public bool IsGoal(PathNode current, PathNode goal)
+    {
+        return current == goal;
     }
 }
 

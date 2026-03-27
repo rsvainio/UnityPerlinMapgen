@@ -23,7 +23,7 @@ public class MapGeneration
 {
     readonly HexGrid grid;
     public Dictionary<(int, int, int), float> precipitationMap, altitudeMap, temperatureMap;
-    private Dictionary<(int, int, int), int> oceanDistanceMap = new();
+    public Dictionary<(int, int, int), int> oceanDistanceMap { get; private set; } = new();
 
     public MapGeneration(HexGrid grid)
     {
@@ -483,15 +483,17 @@ public class MapGeneration
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
 
-        int riverAvgLength = Mathf.RoundToInt((grid.height + grid.width / 2) * 0.1f);
+        int riverMinLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.1f);
         foreach (HexTile tile in riverSourceCandidates)
         {
             //add checks here to make sure the tile is still a valid candidate
             float weight = tile.precipitation * tile.altitude;
             if (Random.value < weight)
             {
-                List<HexTile> newRiver = DoRiverRecursion(tile, Random.Range(riverAvgLength - 3, riverAvgLength + 3));
-                if (newRiver.Count >= 3) // only include rivers that are big enough
+                //List<HexTile> newRiver = DoRiverRecursion(tile, riverMinLength);
+                HexTile riverEnd = findRiverGoal(tile);
+                List<HexTile> newRiver = grid.pathfinding.FindPath(tile, riverEnd, new RiverStrategy(this));
+                if (newRiver.Count >= 5) // only include rivers that are big enough
                 {
                     rivers.Add(newRiver);
                     foreach (HexTile riverTile in newRiver)
@@ -516,14 +518,30 @@ public class MapGeneration
         }
         else if (rivers.Count < riverSourceCandidates.Count * 0.05f)
         {
-            float riverAmount = rivers.Count / riverSourceCandidates.Count;
-            Debug.LogWarning($"Generated rivers from less than 5 % ({riverAmount} %) of candidate river source tiles, possible generation error");
+            float riverAmount = (float) rivers.Count / riverSourceCandidates.Count;
+            Debug.LogWarning($"Generated rivers from only {riverAmount * 100} % of candidate river source tiles, possible generation error");
         }
         else
         {
             Debug.Log($"Generated {rivers.Count} rivers from source candidates");
         }
         return rivers;
+
+        HexTile findRiverGoal(HexTile start)
+        {
+            List<HexTile> candidates = new List<HexTile>();
+            int maxRange = Mathf.RoundToInt((grid.height + grid.width) / 2f * 0.15f);
+            foreach (HexTile candidate in start.GetTilesAtRange(maxRange))
+            {
+                if (candidate.terrain == TerrainTypes.ocean || candidate.terrain == TerrainTypes.freshWater || candidate.hasRiver)
+                {
+                    candidates.Add(candidate);
+                }
+            }
+
+            //return candidates.OrderBy(t => t.altitude).ThenBy(t => HexCoordinates.HexDistance(start, t)).First();
+            return candidates.OrderBy(t => t.altitude * HexCoordinates.HexDistance(start, t)).First();
+        }
 
         // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
         List<HexTile> DoRiverRecursion(HexTile tile, int riverMinimumLength, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
@@ -817,10 +835,6 @@ public class MapGeneration
                     if (neighborTile.terrain == TerrainTypes.ocean)
                     {
                         distanceFromNearestOcean = HexCoordinates.HexDistance(tile.coordinates, neighborTile.coordinates);
-                        //float tileDistance = HexCoordinates.HexDistance(tile.coordinates, neighborTile.coordinates);
-                        //float maxDistance = ((grid.height + grid.width) / 2) * 0.05f; // the maximum distance from which ocean proximity has an effect on temperature
-                        //distanceFromNearestOcean = tileDistance / maxDistance;
-
                         tileQueue.Clear();
                     }
                     else
