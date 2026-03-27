@@ -250,7 +250,7 @@ public class MapGeneration
 
                         float distanceFromMountain = HexCoordinates.HexDistance(tile, tileInRange) / range;
                         float peakHeight = Mathf.Pow(Random.Range(0.8f, 0.99f), mountainAge * 3f);
-                        float newAltitude = Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness));
+                        float newAltitude = Mathf.Lerp(peakHeight, altitudeMap[key], Mathf.Pow(distanceFromMountain, mountainSteepness)); // TODO: make a new function for this so that older mountains have more highlands surrounding them
                         newAltitude = Mathf.Clamp01(newAltitude * noiseFactor);
                         mountainMask[key] = mountainMask.ContainsKey(key) ? Mathf.Max(mountainMask[key], newAltitude) : newAltitude;
                         //mountainMask[key] = mountainMask.ContainsKey(key) ? (mountainMask[key] + newAltitude) / 2f : newAltitude;
@@ -483,7 +483,7 @@ public class MapGeneration
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
 
-        int riverAvgLength = 10;
+        int riverAvgLength = Mathf.RoundToInt((grid.height + grid.width / 2) * 0.1f);
         foreach (HexTile tile in riverSourceCandidates)
         {
             //add checks here to make sure the tile is still a valid candidate
@@ -510,7 +510,19 @@ public class MapGeneration
             }
         }
 
-        Debug.Log($"Generated {rivers.Count} rivers from source candidates");
+        if (riverSourceCandidates.Count < grid.height * grid.width * 0.01f)
+        {
+            Debug.LogWarning($"Found only {riverSourceCandidates.Count} candidate river source tiles, possible generation error");
+        }
+        else if (rivers.Count < riverSourceCandidates.Count * 0.05f)
+        {
+            float riverAmount = rivers.Count / riverSourceCandidates.Count;
+            Debug.LogWarning($"Generated rivers from less than 5 % ({riverAmount} %) of candidate river source tiles, possible generation error");
+        }
+        else
+        {
+            Debug.Log($"Generated {rivers.Count} rivers from source candidates");
+        }
         return rivers;
 
         // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
@@ -624,7 +636,7 @@ public class MapGeneration
             // could also try just taking the final tile of the river and generating a lake from that
             HexTile lakeStartCandidate = null;
             float lowestAltitude = 1f; // this needs to be initialized to some other value, otherwise it's possible for lakes to go up mountains etc.
-            int tilesToIterate = Mathf.RoundToInt((float)river.Count * 0.2f);
+            int tilesToIterate = Mathf.RoundToInt(river.Count * 0.2f);
             for (int i = river.Count - 1; i > river.Count - tilesToIterate; i--)
             {
                 HexTile curRiverTile = river[i];
@@ -933,15 +945,21 @@ public class MapGeneration
             List<TerrainType> candidates = new List<TerrainType>(6);
             foreach (KeyValuePair<TerrainType, int> entry in neighborTerrains)
             {
-                if (entry.Value > requiredTerrainNumber) // clear any previous TerrainTypes in the candidate list
+                TerrainType terrain = entry.Key;
+                int terrainCount = entry.Value;
+                if (terrain == tile.terrain) // add slight inertia to terrain changes
                 {
-                    requiredTerrainNumber = entry.Value;
-                    candidates.Clear();
-                    candidates.Add(entry.Key);
+                    terrainCount++;
                 }
-                else if (entry.Value == requiredTerrainNumber) // add the TerrainType to the candidates list in a draw
+                if (terrainCount > requiredTerrainNumber) // clear any previous TerrainTypes in the candidate list
                 {
-                    candidates.Add(entry.Key);
+                    requiredTerrainNumber = terrainCount;
+                    candidates.Clear();
+                    candidates.Add(terrain);
+                }
+                else if (terrainCount == requiredTerrainNumber) // add the TerrainType to the candidates list in a draw
+                {
+                    candidates.Add(terrain);
                 }
             }
             newTerrains[i] = candidates[Random.Range(0, candidates.Count)]; // select a random TerrainType from all the candidates
