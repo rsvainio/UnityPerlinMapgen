@@ -200,7 +200,7 @@ public class MapGeneration
                     mountainRangeEnd = validMountainRangeEnds[j];
                     if (altitudeMap[mountainRangeEnd.coordinates.ToTuple()] > grid.waterLevel)
                     {
-                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, strategy: new MountainStrategy(new TerrainType[] {TerrainTypes.ocean, TerrainTypes.freshWater})); // should test forbidding pathfinding through water tiles here to see if it makes mountains looke more natural
+                        mountainPath = grid.pathfinding.FindPath(mountainRangeStart, mountainRangeEnd, strategy: new MountainStrategy(new TerrainType[] {TerrainTypes.ocean, TerrainTypes.freshWater}));
                         if (mountainPath.Count > 0)
                         {
                             Debug.Assert(mountainPath[0] == mountainRangeStart && mountainPath[mountainPath.Count - 1] == mountainRangeEnd, "Path mismatch with mountain points", mountainRangeStart);
@@ -491,8 +491,7 @@ public class MapGeneration
             if (Random.value < weight)
             {
                 //List<HexTile> newRiver = DoRiverRecursion(tile, riverMinLength);
-                HexTile riverEnd = findRiverGoal(tile);
-                List<HexTile> newRiver = grid.pathfinding.FindPath(tile, riverEnd, new RiverStrategy(this));
+                List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this)); // TODO: add lake building to this
                 if (newRiver.Count >= 5) // only include rivers that are big enough
                 {
                     rivers.Add(newRiver);
@@ -526,22 +525,6 @@ public class MapGeneration
             Debug.Log($"Generated {rivers.Count} rivers from source candidates");
         }
         return rivers;
-
-        HexTile findRiverGoal(HexTile start)
-        {
-            List<HexTile> candidates = new List<HexTile>();
-            int maxRange = Mathf.RoundToInt((grid.height + grid.width) / 2f * 0.15f);
-            foreach (HexTile candidate in start.GetTilesAtRange(maxRange))
-            {
-                if (candidate.terrain == TerrainTypes.ocean || candidate.terrain == TerrainTypes.freshWater || candidate.hasRiver)
-                {
-                    candidates.Add(candidate);
-                }
-            }
-
-            //return candidates.OrderBy(t => t.altitude).ThenBy(t => HexCoordinates.HexDistance(start, t)).First();
-            return candidates.OrderBy(t => t.altitude * HexCoordinates.HexDistance(start, t)).First();
-        }
 
         // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
         List<HexTile> DoRiverRecursion(HexTile tile, int riverMinimumLength, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)

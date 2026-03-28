@@ -15,41 +15,44 @@ public class Pathfinding
         BuildNodeMap();
     }
 
-    public List<HexTile> FindPath(HexTile startTile, HexTile endTile, IPathFindingStrategy strategy = null)
+    public List<HexTile> FindPath(HexTile startTile, HexTile endTile = null, IPathFindingStrategy strategy = null)
     {
         PathNode startNode = _nodes[startTile.coordinates.ToTuple()];
-        PathNode endNode = _nodes[endTile.coordinates.ToTuple()];
         strategy ??= new AStar();
-
-        List<PathNode> nodePath = DoPathfinding(startNode, endNode, strategy);
-        List<HexTile> tilePath = new List<HexTile>();
-        if (nodePath.Count > 0)
+        if (strategy is SingleGoalStrategy x)
         {
-            nodePath.ForEach(x => tilePath.Add(x.tile));
+            x.goal = _nodes[endTile.coordinates.ToTuple()];
+        }
+
+        List<PathNode> nodePath = DoPathfinding(startNode, strategy);
+        List<HexTile> tilePath = new List<HexTile>();
+        nodePath.ForEach(x => tilePath.Add(x.tile));
+        if (strategy is SingleGoalStrategy)
+        {
             Debug.Assert(tilePath[0] == startTile && tilePath[tilePath.Count - 1] == endTile, "Returned path mismatch with parameter tiles");
         }
         ResetNodes();
         return tilePath;
     }
 
-    private List<PathNode> DoPathfinding(PathNode startNode, PathNode goal, IPathFindingStrategy strategy)
+    private List<PathNode> DoPathfinding(PathNode startNode, IPathFindingStrategy strategy)
     {
         Debug.Log("Starting pathfinding...", startNode.tile);
         Heap<PathNode> openSet = new Heap<PathNode>(_grid.width * _grid.height);
         Dictionary<PathNode, bool> closedSet = new Dictionary<PathNode, bool>(_grid.width * _grid.height);
         openSet.Insert(startNode);
         startNode.gScore = 0;
-        startNode.hScore = strategy.Heuristic(startNode, goal);
+        startNode.hScore = strategy.Heuristic(startNode);
 
         while (openSet.Count > 0)
         {
             PathNode current = openSet.ExtractFirst();
             closedSet[current] = true;
-            if (strategy.IsGoal(current, goal))
+            if (strategy.IsGoal(current))
             {
                 // if this is made to work with multiple PathNode layers then a check is required here to see if this current iteration is the lowest layer
                 Debug.Log("Finished pathfinding", current.tile);
-                return ReconstructPath(goal);
+                return ReconstructPath(current);
             }
 
             foreach (PathNode neighbor in current.neighbors)
@@ -64,7 +67,7 @@ public class Pathfinding
                 {
                     neighbor.cameFrom = current;
                     neighbor.gScore = moveCost;
-                    neighbor.hScore = strategy.Heuristic(neighbor, goal);
+                    neighbor.hScore = strategy.Heuristic(neighbor);
 
                     if (!openSet.Contains(neighbor))
                     {
@@ -79,7 +82,11 @@ public class Pathfinding
         }
 
         Debug.LogWarning("Failed to find a valid path from tile:", startNode.tile);
-        Debug.LogWarning("Target tile:", goal.tile);
+        SingleGoalStrategy singleGoalStrategy = strategy as SingleGoalStrategy;
+        if (singleGoalStrategy != null)
+        {
+            Debug.LogWarning("Target tile:", singleGoalStrategy.goal.tile);
+        }
         return new List<PathNode>(); // failed to find a valid path from startNode to endNode
     }
 
@@ -172,39 +179,46 @@ public interface IPathFindingStrategy
 {
     TerrainType[] forbiddenTerrains { get; set; }
 
-    float Heuristic(PathNode current, PathNode goal);
+    float Heuristic(PathNode current);
     float StepCost(PathNode current, PathNode neighbor);
-    bool IsGoal(PathNode current, PathNode goal);
+    bool IsGoal(PathNode current);
 }
 
-public class AStar : IPathFindingStrategy
+public abstract class SingleGoalStrategy : IPathFindingStrategy
 {
     public TerrainType[] forbiddenTerrains { get; set; }
+    public PathNode goal { get; set; }
 
-    public AStar(TerrainType[] forbiddenTerrains = null)
+    public SingleGoalStrategy(TerrainType[] forbiddenTerrains = null)
     {
         this.forbiddenTerrains = forbiddenTerrains ?? new TerrainType[0];
     }
 
-    public virtual float Heuristic(PathNode current, PathNode goal)
+    public abstract float Heuristic(PathNode current);
+    public abstract float StepCost(PathNode current, PathNode neighbor);
+    public bool IsGoal(PathNode current) => current.tile == goal.tile;
+}
+
+public class AStar : SingleGoalStrategy
+{
+    public AStar(TerrainType[] forbiddenTerrains = null) : base(forbiddenTerrains) { }
+
+    public override float Heuristic(PathNode current)
     {
         return HexCoordinates.HexDistance(current.tile, goal.tile);
     }
 
-    public virtual float StepCost(PathNode current, PathNode neighbor)
+    public override float StepCost(PathNode current, PathNode neighbor)
     {
         return current.gScore + neighbor.movementCost;
-    }
-
-    public virtual bool IsGoal(PathNode current, PathNode goal)
-    {
-        return current.tile == goal.tile;
     }
 }
 
 public class Dijkstra : AStar
 {
-    public override float Heuristic(PathNode current, PathNode goal)
+    public Dijkstra(TerrainType[] forbiddenTerrains = null) : base(forbiddenTerrains) { }
+
+    public override float Heuristic(PathNode current)
     {
         return 0;
     }
@@ -212,6 +226,8 @@ public class Dijkstra : AStar
 
 public class AsTheCrowFlies : AStar
 {
+    public AsTheCrowFlies(TerrainType[] forbiddenTerrains = null) : base(forbiddenTerrains) { }
+
     public override float StepCost(PathNode current, PathNode neighbor)
     {
         return 1;
@@ -220,7 +236,8 @@ public class AsTheCrowFlies : AStar
 
 public class MountainStrategy : AStar
 {
-    public MountainStrategy(TerrainType[] forbiddenTerrains) : base(forbiddenTerrains) { }
+    public MountainStrategy(TerrainType[] forbiddenTerrains = null) : base(forbiddenTerrains) { }
+
     private Dictionary<PathNode, float> _nodeNoises = new(); // the cost function needs to be deterministic so keep a single noise value for each tile
 
     public override float StepCost(PathNode current, PathNode neighbor)
@@ -250,7 +267,7 @@ public class RiverStrategy : IPathFindingStrategy
 
     private MapGeneration _mapGen;
 
-    public float Heuristic(PathNode current, PathNode goal)
+    public float Heuristic(PathNode current)
     {
         //return 1f;
         return _mapGen.oceanDistanceMap[current.tile.coordinates.ToTuple()] * 0.2f;
@@ -279,29 +296,43 @@ public class RiverStrategy : IPathFindingStrategy
         return Mathf.Max(0.1f, cost);
     }
 
-    // TODO: figure out a way to implement an early-exit here, as currently it causes rivers generated with this strategy to go across each other and to travel through water bodies
-    public bool IsGoal(PathNode current, PathNode goal)
+    public bool IsGoal(PathNode current)
     {
-        return current == goal;
+        if (current.tile.terrain == TerrainTypes.ocean || current.tile.terrain == TerrainTypes.freshWater || current.tile.hasRiver)
+        {
+            return true;
+        }
+        else
+        {
+            foreach (HexTile neighbor in current.tile.neighbors)
+            {
+                if (neighbor.terrain == TerrainTypes.ocean || neighbor.terrain == TerrainTypes.freshWater || neighbor.hasRiver)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
 
-public class BreadthFirst : IPathFindingStrategy
-{
-    public TerrainType[] forbiddenTerrains { get; set; }
+//public class BreadthFirst : IPathFindingStrategy
+//{
+//    public TerrainType[] forbiddenTerrains { get; set; }
 
-    public float Heuristic(PathNode current, PathNode goal)
-    {
-        throw new NotImplementedException();
-    }
+//    public float Heuristic(PathNode current, PathNode goal)
+//    {
+//        throw new NotImplementedException();
+//    }
 
-    public float StepCost(PathNode current, PathNode neighbor)
-    {
-        throw new NotImplementedException();
-    }
+//    public float StepCost(PathNode current, PathNode neighbor)
+//    {
+//        throw new NotImplementedException();
+//    }
 
-    public bool IsGoal(PathNode current, PathNode goal)
-    {
-        throw new NotImplementedException();
-    }
-}
+//    public bool IsGoal(PathNode current, PathNode goal)
+//    {
+//        throw new NotImplementedException();
+//    }
+//}
