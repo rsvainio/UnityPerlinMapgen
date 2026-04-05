@@ -15,7 +15,7 @@ public class HexGridInspector : Editor
 
     // map generation parameters
     float precipitationScale = 2f;
-    float precipitationExponent = 2f;
+    float precipitationExponent = 2.5f; // 2.0 creates environments that are too wet during rain shadow simulation when setting the initial cloud covers; 2.5 and above seem to work better
     float altitudeScale = 7f; // these values are tuned with elevation feature generation in mind
     float altitudeExponent = 2f; // these values are tuned with elevation feature generation in mind
     int altitudeAmplitudes = 4;
@@ -201,40 +201,42 @@ public class HexGridInspector : Editor
 
             if (GUILayout.Button("Cellular automata pass"))
             {
-                Dictionary<(int, int, int), float> altitudeMap = new();
-                foreach (HexTile tile in grid.tilesArray)
-                {
-                    altitudeMap.Add(tile.coordinates.ToTuple(), tile.altitude);
-                }
-                altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
+                mapGenerator.ConsolidateTerrains();
 
-                foreach (HexTile tile in grid.tilesArray)
-                {
-                    (int, int, int) coordinates = tile.coordinates.ToTuple();
-                    float altitude = altitudeMap[coordinates];
-                    tile.altitude = altitude;
-                    if (altitude <= grid.waterLevel) // water level, might need tweaking
-                    {
-                        Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
-                        tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
-                    }
-                    else if (altitude >= 0.7f)
-                    {
-                        if (altitude >= 0.9f)
-                        {
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
-                        }
-                        else if (altitude >= 0.8f)
-                        {
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
-                        }
-                        else
-                        {
-                            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
-                        }
-                    }
-                }
-            }
+            //Dictionary<(int, int, int), float> altitudeMap = new();
+            //foreach (HexTile tile in grid.tilesArray)
+            //{
+            //    altitudeMap.Add(tile.coordinates.ToTuple(), tile.altitude);
+            //}
+            //altitudeMap = mapGenerator.DoCellularAutomataPass(altitudeMap, cellularAutomataBoundary, neighborTilesForTransition: 2);
+
+            //foreach (HexTile tile in grid.tilesArray)
+            //{
+            //    (int, int, int) coordinates = tile.coordinates.ToTuple();
+            //    float altitude = altitudeMap[coordinates];
+            //    tile.altitude = altitude;
+            //    if (altitude <= grid.waterLevel) // water level, might need tweaking
+            //    {
+            //        Color colorBlend = Color.Lerp(new Color(0.5294118f, 0.8078432f, 0.9215687f), new Color(0f, 0f, 0.5450981f), 1f - altitude / 0.175f);
+            //        tile.GetComponentInChildren<MeshRenderer>().material.color = colorBlend;
+            //    }
+            //    else if (altitude >= 0.7f)
+            //    {
+            //        if (altitude >= 0.9f)
+            //        {
+            //            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(1f, 1f, 1f);
+            //        }
+            //        else if (altitude >= 0.8f)
+            //        {
+            //            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.8f, 0.8f, 0.8f);
+            //        }
+            //        else
+            //        {
+            //            tile.GetComponentInChildren<MeshRenderer>().material.color = new Color(0.6f, 0.6f, 0.6f);
+            //        }
+            //    }
+            //}
+        }
         }
 
         mountainGenerationFoldout = EditorGUILayout.Foldout(mountainGenerationFoldout, "Mountain Generation", true);
