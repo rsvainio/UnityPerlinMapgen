@@ -258,6 +258,7 @@ public class MountainStrategy : AStar
 public class RiverStrategy : IPathFindingStrategy
 {
     public TerrainType[] forbiddenTerrains { get; set; }
+    private MapGeneration _mapGen;
 
     public RiverStrategy(MapGeneration mapGen, TerrainType[] forbiddenTerrains = null)
     {
@@ -265,12 +266,9 @@ public class RiverStrategy : IPathFindingStrategy
         this.forbiddenTerrains = forbiddenTerrains ?? new TerrainType[0];
     }
 
-    private MapGeneration _mapGen;
-
     public float Heuristic(PathNode current)
     {
-        //return 1f;
-        return _mapGen.oceanDistanceMap[current.tile.coordinates.ToTuple()] * 0.2f;
+        return _mapGen.oceanDistanceMap[current.tile.coordinates.ToTuple()] * 0.05f;
     }
 
     // strongly penalise going uphill
@@ -281,17 +279,17 @@ public class RiverStrategy : IPathFindingStrategy
 
         if (heightDifference > 0)
         {
-            cost += heightDifference * 10f;
+            cost += heightDifference * 100f + 10;
         }
         else
         {
-            cost += heightDifference;
+            cost += heightDifference * 10f;
         }
 
         Vector3 dirFrom = current.cameFrom != null ? current.tile.coordinates.ToVec3() - current.cameFrom.tile.coordinates.ToVec3() : Vector3.zero;
         Vector3 dirTo = neighbor.tile.coordinates.ToVec3() - current.tile.coordinates.ToVec3();
         float alignment = Vector3.Dot(dirFrom.normalized, dirTo.normalized);
-        cost -= alignment * 0.2f;
+        cost += alignment * 0.1f;
 
         return Mathf.Max(0.1f, cost);
     }
