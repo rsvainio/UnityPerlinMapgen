@@ -492,7 +492,16 @@ public class MapGeneration
             {
                 //List<HexTile> newRiver = DoRiverRecursion(tile, riverMinLength);
                 List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this)); // TODO: add lake building to this
-                if (newRiver.Count >= 5) // only include rivers that are big enough
+                if (Random.value >= 0.5f)
+                {
+                    newRiver = BuildLake(newRiver);
+                    rivers.Add(newRiver);
+                    foreach (HexTile riverTile in newRiver)
+                    {
+                        riverTile.hasRiver = true;
+                    }
+                }
+                else if (newRiver.Count >= 5) // only include rivers that are big enough
                 {
                     rivers.Add(newRiver);
                     foreach (HexTile riverTile in newRiver)
