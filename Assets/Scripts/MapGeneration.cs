@@ -129,7 +129,7 @@ public class MapGeneration
         }
 
         GenerateWaterBoundary();
-        GenerateMountainRanges();
+        GenerateMountainRanges(mountainRangeCount: 2);
 
         altitudeMap = DoCellularAutomataPass(altitudeMap, grid.waterLevel); // water level cellular automata pass
         altitudeMap = DoCellularAutomataPass(altitudeMap, 0.7f, passes: 2); // mountain level cellular automata pass
@@ -174,7 +174,7 @@ public class MapGeneration
             return altitudeMap;
         }
 
-        void GenerateMountainRanges(int mountainRangeCount = 3)
+        void GenerateMountainRanges(int mountainRangeCount)
         {
             int mountainRangeMaxLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.35f); // 35% of the map
             int mountainRangeMinLength = Mathf.RoundToInt(mountainRangeMaxLength * 0.5f);
@@ -473,7 +473,7 @@ public class MapGeneration
     // altitude seems to be the biggest obstacle for river source candidate spots being found
     // might be fixed after elevation feature generation is implemented
     // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.65f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.5f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
     {
         List<HexTile> riverSourceCandidates = grid.tilesArray.Where(t => t.altitude >= minAltitude
                                                 && t.temperature >= minPrecipitation
@@ -482,27 +482,21 @@ public class MapGeneration
         riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.altitude).ToList(); // sort the list of candidates by altitude
         Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
         List<List<HexTile>> rivers = new List<List<HexTile>>();
+        int riverMinLength = Mathf.RoundToInt((grid.height + grid.width) / 2f * 0.05f);
 
-        int riverMinLength = Mathf.RoundToInt((grid.height + grid.width) / 2 * 0.1f);
         foreach (HexTile tile in riverSourceCandidates)
         {
             //add checks here to make sure the tile is still a valid candidate
             float weight = tile.precipitation * tile.altitude;
             if (Random.value < weight)
             {
-                //List<HexTile> newRiver = DoRiverRecursion(tile, riverMinLength);
-                List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this)); // TODO: add lake building to this
-                if (Random.value >= 0.5f)
+                List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this));
+                if (newRiver.Count >= riverMinLength) // only include rivers that are big enough
                 {
-                    newRiver = BuildLake(newRiver);
-                    rivers.Add(newRiver);
-                    foreach (HexTile riverTile in newRiver)
+                    if (Random.value > 0.2f)
                     {
-                        riverTile.hasRiver = true;
+                        newRiver = BuildLake(newRiver);
                     }
-                }
-                else if (newRiver.Count >= 5) // only include rivers that are big enough
-                {
                     rivers.Add(newRiver);
                     foreach (HexTile riverTile in newRiver)
                     {
@@ -636,12 +630,12 @@ public class MapGeneration
         //       this isn't necessarily an unwanted interaction but the split-off part of the river needs to be assigned to a new river list
         List<HexTile> BuildLake(List<HexTile> river)
         {
-            Debug.Log("Attempting to create a lake from a river...", river[0]);
-            if (river.Count < 3)
+            if (river.Count == 0)
             {
-                Debug.Log("River size too small to build lakes, returning...", river[0]);
+                Debug.Log("River HexTile list is empty, returning...");
                 return river;
             }
+            Debug.Log("Attempting to create a lake from a river...", river[0]);
 
             // could also try just taking the final tile of the river and generating a lake from that
             HexTile lakeStartCandidate = null;
