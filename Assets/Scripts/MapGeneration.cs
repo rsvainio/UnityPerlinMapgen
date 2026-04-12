@@ -639,20 +639,29 @@ public class MapGeneration
 
             // could also try just taking the final tile of the river and generating a lake from that
             HexTile lakeStartCandidate = null;
-            float lowestAltitude = 1f; // this needs to be initialized to some other value, otherwise it's possible for lakes to go up mountains etc.
+            float lowestAltitude = 1f;
             int tilesToIterate = Mathf.RoundToInt(river.Count * 0.2f);
             for (int i = river.Count - 1; i > river.Count - tilesToIterate; i--)
             {
                 HexTile curRiverTile = river[i];
-                foreach (HexTile neighbor in curRiverTile.neighbors)
+                if (curRiverTile.altitude < lowestAltitude)
                 {
-                    float neighborAltitude = neighbor.altitude;
-                    if (neighborAltitude < lowestAltitude && !river.Contains(neighbor))
-                    {
-                        lowestAltitude = neighborAltitude;
-                        lakeStartCandidate = neighbor;
-                    }
+                    lowestAltitude = curRiverTile.altitude;
+                    lakeStartCandidate = curRiverTile;
                 }
+
+                // should tiles that neighbour the initial river tile even be considered?
+                // would it not make more sense for the lake to always start from a tile that is in the actual river?
+                //lowestAltitude = Mathf.Min(curRiverTile.altitude, lowestAltitude); // prevent lake tiles from starting at a higher altitude than their initial river tile
+                //foreach (HexTile neighbor in curRiverTile.neighbors)
+                //{
+                //    float neighborAltitude = neighbor.altitude;
+                //    if (neighborAltitude < lowestAltitude && !river.Contains(neighbor))
+                //    {
+                //        lowestAltitude = neighborAltitude;
+                //        lakeStartCandidate = neighbor;
+                //    }
+                //}
             }
             if (lakeStartCandidate == null)
             {
@@ -673,17 +682,17 @@ public class MapGeneration
                 for (int i = lakeNeighbors.Count - 1; i >= 0; i--)
                 {
                     HexTile neighbor = lakeNeighbors[i];
-                    TerrainType terrain = neighbor.terrain;
+                    TerrainType neighborTerrain = neighbor.terrain;
                     float neighborAltitude = neighbor.altitude;
                     // encountering either another lake or an ocean will result in the current lake being terminated,
                     // but it'll likely create a noticeable artefact where the two bodies of water connect with only 1 tile
-                    if (terrain == TerrainTypes.ocean || terrain == TerrainTypes.freshWater)
+                    if (neighborTerrain == TerrainTypes.ocean || neighborTerrain == TerrainTypes.freshWater)
                     {
                         lake.Add(neighbor);
-                        newLakeTerrain = terrain;
+                        newLakeTerrain = neighborTerrain;
                         nextLakeTile = null;
 
-                        foreach (HexTile tile in neighbor.neighbors.Where(x => x.terrain != TerrainTypes.ocean || x.terrain != TerrainTypes.freshWater))
+                        foreach (HexTile tile in neighbor.neighbors.Where(x => x.terrain != TerrainTypes.ocean && x.terrain != TerrainTypes.freshWater))
                         {
                             if (!lake.Contains(tile))
                             {
@@ -702,7 +711,7 @@ public class MapGeneration
                                 neighboringLakeTiles++;
                             }
                         }
-                        neighborAltitude *= 1f - neighboringLakeTiles * 0.1f; // check that this value doesn't need to be adjusted
+                        neighborAltitude *= 1f - neighboringLakeTiles * 0.1f; // the biasing might be too strong
 
                         if (neighborAltitude < lowestAltitude)
                         {
@@ -731,8 +740,8 @@ public class MapGeneration
                 lakeTile.terrain = newLakeTerrain;
                 river.Remove(lakeTile);
 
-                HexTile[] neighbors = lakeTile.neighbors;
                 float altitude = lakeTile.altitude;
+                HexTile[] neighbors = lakeTile.neighbors;
                 foreach (HexTile neighbor in neighbors)
                 {
                     altitude += neighbor.altitude;
