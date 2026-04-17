@@ -279,7 +279,14 @@ public class RiverStrategy : IPathFindingStrategy
 
         if (heightDifference > 0)
         {
-            cost += heightDifference * 100f + 10;
+            if (neighbor.tile.altitude >= 0.75f || (heightDifference >= 0.1f && neighbor.tile.altitude >= 0.5f))
+            {
+                return int.MaxValue;
+            }
+            else
+            {
+                cost += heightDifference * 10f + 100;
+            }
         }
         else
         {
