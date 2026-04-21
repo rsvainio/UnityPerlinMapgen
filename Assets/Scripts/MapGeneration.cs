@@ -471,28 +471,36 @@ public class MapGeneration
     }
 
     // altitude seems to be the biggest obstacle for river source candidate spots being found
-    // might be fixed after elevation feature generation is implemented
-    // the pathfinding for rivers is probably quite naive, should try and implement something else
-    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.5f, float minTemperature = 0.1f, float minPrecipitation = 0.1f)
+    // might be fixed after elevation feature generation is implemented 
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.5f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
     {
         List<HexTile> riverSourceCandidates = grid.tilesArray.Where(t => t.altitude >= minAltitude
                                                 && t.temperature >= minPrecipitation
                                                 && t.precipitation >= minTemperature)
                                             .ToList();
-        riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.altitude).ToList(); // sort the list of candidates by altitude
-        Debug.Log($"Found {riverSourceCandidates.Count} river source candidates");
+        //riverSourceCandidates = riverSourceCandidates.OrderByDescending(t => t.altitude).ToList(); // sort the list of candidates by altitude
         List<List<HexTile>> rivers = new List<List<HexTile>>();
         int riverMinLength = Mathf.RoundToInt((grid.height + grid.width) / 2f * 0.05f);
-
-        foreach (HexTile tile in riverSourceCandidates)
+        int riversToGenerate = Mathf.RoundToInt(riverSourceCandidates.Count * Random.Range(0.01f, 0.1f));
+        Debug.Log($"Attempting to generate {riversToGenerate} rivers from {riverSourceCandidates.Count} river source candidates...");
+        while (riversToGenerate > 0)
         {
-            //add checks here to make sure the tile is still a valid candidate
-            float weight = tile.precipitation * tile.altitude;
-            if (Random.value < weight)
+            if (riverSourceCandidates.Count == 0)
             {
+                Debug.LogWarning($"River source candidates ran out before all rivers could be generated, generated {rivers.Count} rivers");
+                break;
+            }
+            int i = Random.Range(0, riverSourceCandidates.Count);
+            HexTile tile = riverSourceCandidates[i];
+
+            float weight = tile.precipitation * tile.altitude;
+            if (true)
+            {
+                riverSourceCandidates.RemoveAt(i);
                 List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this));
                 if (newRiver.Count >= riverMinLength) // only include rivers that are big enough
                 {
+                    riversToGenerate--;
                     if (Random.value > 0.2f)
                     {
                         newRiver = BuildLake(newRiver);
@@ -503,25 +511,43 @@ public class MapGeneration
                         riverTile.hasRiver = true;
                     }
                 }
-                else
-                {
-                    foreach (HexTile riverTile in newRiver)
-                    {
-                        riverTile.hasRiver = false;
-                    }
-                    newRiver.Clear();
-                }
             }
         }
+
+        //foreach (HexTile tile in riverSourceCandidates)
+        //{
+        //    //add checks here to make sure the tile is still a valid candidate
+        //    float weight = tile.precipitation * tile.altitude;
+        //    if (Random.value < weight)
+        //    {
+        //        List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this));
+        //        if (newRiver.Count >= riverMinLength) // only include rivers that are big enough
+        //        {
+        //            if (newRiver[newRiver.Count].terrain)
+        //            {
+
+        //            }
+        //            else if (Random.value > 0.2f)
+        //            {
+        //                newRiver = BuildLake(newRiver);
+        //            }
+        //            rivers.Add(newRiver);
+        //            foreach (HexTile riverTile in newRiver)
+        //            {
+        //                riverTile.hasRiver = true;
+        //            }
+        //        }
+        //    }
+        //}
 
         if (riverSourceCandidates.Count < grid.height * grid.width * 0.01f)
         {
             Debug.LogWarning($"Found only {riverSourceCandidates.Count} candidate river source tiles, possible generation error");
         }
-        else if (rivers.Count < riverSourceCandidates.Count * 0.05f)
+        if (rivers.Count < riverSourceCandidates.Count * 0.05f)
         {
             float riverAmount = (float) rivers.Count / riverSourceCandidates.Count;
-            Debug.LogWarning($"Generated rivers from only {riverAmount * 100} % of candidate river source tiles, possible generation error");
+            Debug.LogWarning($"Generated rivers from only {riverAmount * 100} % ({rivers.Count}) of candidate river source tiles, possible generation error");
         }
         else
         {
