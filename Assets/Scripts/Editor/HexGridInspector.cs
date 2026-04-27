@@ -171,8 +171,8 @@ public class HexGridInspector : Editor
                     {
                         for (int i = 0; i < river.Count; i++)
                         {
-                            float blueShade = Mathf.Lerp(0f, 1f, 1 - ((float)i / river.Count));
-                            river[i].GetComponentInChildren<MeshRenderer>().material.color = new Color(0, 0, blueShade);
+                            float blueShade = Mathf.Lerp(0.5f, 1f, 1 - ((float)i / river.Count));
+                            river[i].GetComponentInChildren<MeshRenderer>().material.color = new Color(0, blueShade / 2f, blueShade);
                         }
                     }
                 }
