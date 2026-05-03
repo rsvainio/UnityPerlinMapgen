@@ -518,7 +518,7 @@ public class MapGeneration
             }
         }
 
-        List<HexTile> BuildRiver(HexTile start)
+        List<HexTile> BuildRiver(HexTile start, bool preventTightLoops = true)
         {
             List<HexTile> path = new List<HexTile>();
             HexTile current = start;
@@ -528,12 +528,35 @@ public class MapGeneration
                 if (riverMap.GetValueOrDefault(current)) { break; }
                 riverMap[current] = true;
                 path.Add(current);
+                if (current.neighbors.Any(x => x.terrain == TerrainTypes.freshWater || x.terrain == TerrainTypes.ocean))
+                {
+                    break;
+                }
 
-                HexTile next = current.neighbors
-                    .Where(n => flowMap.GetValueOrDefault(n) > 0)
-                    .OrderByDescending(n => flowMap.GetValueOrDefault(n))
-                    .ThenByDescending(n => n.altitude + Random.Range(0.0f, 0.05f))
-                    .FirstOrDefault();
+                HexTile next = null;
+                if (preventTightLoops)
+                {
+                    foreach (HexTile neighbor in current.neighbors
+                        .Where(n => flowMap.GetValueOrDefault(n) > 0)
+                        .OrderByDescending(n => flowMap.GetValueOrDefault(n))
+                        .ThenByDescending(n => n.altitude + Random.Range(0.0f, 0.05f)))
+                    {
+                        if (neighbor.neighbors.Any(x => x != current && path.Contains(x)))
+                        {
+                            continue;
+                        }
+                        next = neighbor;
+                        break;
+                    }
+                }
+                else
+                {
+                    next = current.neighbors
+                        .Where(n => flowMap.GetValueOrDefault(n) > 0)
+                        .OrderByDescending(n => flowMap.GetValueOrDefault(n))
+                        .ThenByDescending(n => n.altitude + Random.Range(0.0f, 0.05f))
+                        .FirstOrDefault();
+                }                    
 
                 if (next == null) {  break; }
                 current = next;
@@ -552,18 +575,34 @@ public class MapGeneration
                 if (riverMap.GetValueOrDefault(current)) { break; }
                 riverMap[current] = true;
                 path.Add(current);
-                foreach (HexTile neighbor in current.neighbors)
+                if (current.neighbors.Any(x => x.terrain == TerrainTypes.freshWater || x.terrain == TerrainTypes.ocean))
                 {
-                    if (neighbor.terrain == TerrainTypes.freshWater || neighbor.terrain == TerrainTypes.ocean)
+                    break;
+                }
+
+                HexTile next = null;
+                if (preventTightLoops)
+                {
+                    foreach (HexTile neighbor in current.neighbors
+                        .OrderByDescending(n => flowMap.GetValueOrDefault(n))
+                        .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f)))
                     {
+                        if (neighbor.neighbors.Any(x => x != current && path.Contains(x)))
+                        {
+                            continue;
+                        }
+                        next = neighbor;
                         break;
                     }
                 }
-
-                HexTile next = current.neighbors
+                else
+                {
+                    next = current.neighbors
                     .OrderByDescending(n => flowMap.GetValueOrDefault(n))
                     .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f))
                     .FirstOrDefault();
+                }
+                
 
                 if (next == null) { break; }
                 current = next;
