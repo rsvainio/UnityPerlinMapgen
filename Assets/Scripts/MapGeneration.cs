@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Terrain;
 using UnityEngine;
@@ -471,9 +470,8 @@ public class MapGeneration
         return;
     }
 
-    // altitude seems to be the biggest obstacle for river source candidate spots being found
-    // might be fixed after elevation feature generation is implemented 
-    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.5f, float minTemperature = 0.2f, float minPrecipitation = 0.2f)
+    // riverPercentileToGenerate could be calculated dynamically, as currently depending on the map's specifics, 0.05 sometimes generates too few rivers, and sometimes too many
+    public List<List<HexTile>> GenerateRivers(float minAltitude = 0.5f, float minTemperature = 0.2f, float minPrecipitation = 0.2f, float riverPercentileToGenerate = 0.05f)
     {
         List<HexTile> riverSourceCandidates = grid.tilesArray.Where(t => t.altitude >= minAltitude
                                                 && t.temperature >= minPrecipitation
@@ -523,7 +521,7 @@ public class MapGeneration
             }
         }
 
-        List<HexTile> BuildRiver(HexTile start, bool preventTightLoops = false)
+        List<HexTile> BuildRiver(HexTile start, bool preventTightLoops = true)
         {
             List<HexTile> path = new List<HexTile>();
             HexTile current = start;
@@ -546,10 +544,17 @@ public class MapGeneration
                         .OrderByDescending(n => flowMap.GetValueOrDefault(n))
                         .ThenByDescending(n => n.altitude + Random.Range(0.0f, 0.05f)))
                     {
-                        if (neighbor.neighbors.Any(x => x != current && path.Contains(x)))
+                        if (path.Contains(neighbor))
                         {
                             continue;
                         }
+
+                        int adjacentRiverTiles = neighbor.neighbors.Count(x => x != neighbor && path.Contains(x));
+                        if (adjacentRiverTiles >= 2)
+                        {
+                            continue;
+                        }
+
                         next = neighbor;
                         break;
                     }
@@ -589,13 +594,21 @@ public class MapGeneration
                 if (preventTightLoops)
                 {
                     foreach (HexTile neighbor in current.neighbors
+                        .Where(n => n.altitude < current.altitude * 1.1f)
                         .OrderByDescending(n => flowMap.GetValueOrDefault(n))
                         .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f)))
                     {
-                        if (neighbor.neighbors.Any(x => x != current && path.Contains(x)))
+                        if (path.Contains(neighbor))
                         {
                             continue;
                         }
+
+                        int adjacentRiverTiles = neighbor.neighbors.Count(x => x != neighbor && path.Contains(x));
+                        if (adjacentRiverTiles >= 2)
+                        {
+                            continue;
+                        }
+
                         next = neighbor;
                         break;
                     }
@@ -603,6 +616,7 @@ public class MapGeneration
                 else
                 {
                     next = current.neighbors
+                        .Where(n => n.altitude < current.altitude * 1.1f)
                         .OrderByDescending(n => flowMap.GetValueOrDefault(n))
                         .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f))
                         .FirstOrDefault();
@@ -619,15 +633,13 @@ public class MapGeneration
         {
             float flowValue = flowMap[tile];
             float normalizedFlow = (float) flowValue / maxFlow;
-            if (normalizedFlow > 0.05f || Random.value < normalizedFlow)
+            if (normalizedFlow > riverPercentileToGenerate)
             {
                 foreach (HexTile neighbor in tile.neighbors)
                 {
                     int higherNeighbors = tile.neighbors.Count(n => flowMap.GetValueOrDefault(neighbor) > flowValue);
                     return higherNeighbors <= 1;
                 }
-
-                return true;
             }
 
             return false;
