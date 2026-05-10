@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Terrain;
 using UnityEngine;
@@ -504,21 +505,25 @@ public class MapGeneration
             if (IsValidRiverSource(tile))
             {
                 List<HexTile> newRiver = BuildRiver(tile);
-                if (newRiver.Count < riverMinLength) // only include rivers that are big enough
+                if (newRiver.Count >= riverMinLength) // only include rivers that are big enough
+                {
+                    if (Random.value < 0.25f)
+                    {
+                        newRiver = BuildLake(newRiver);
+                    }
+                    rivers.Add(newRiver);
+                }
+                else
                 {
                     foreach (HexTile riverTile in newRiver)
                     {
                         riverMap[riverTile] = false;
                     }
                 }
-                else
-                {
-                    rivers.Add(newRiver);
-                }
             }
         }
 
-        List<HexTile> BuildRiver(HexTile start, bool preventTightLoops = true)
+        List<HexTile> BuildRiver(HexTile start, bool preventTightLoops = false)
         {
             List<HexTile> path = new List<HexTile>();
             HexTile current = start;
@@ -556,9 +561,9 @@ public class MapGeneration
                         .OrderByDescending(n => flowMap.GetValueOrDefault(n))
                         .ThenByDescending(n => n.altitude + Random.Range(0.0f, 0.05f))
                         .FirstOrDefault();
-                }                    
+                }
 
-                if (next == null) {  break; }
+                if (next == null) { break; }
                 current = next;
             }
             if (path.Count == 0)
@@ -598,11 +603,10 @@ public class MapGeneration
                 else
                 {
                     next = current.neighbors
-                    .OrderByDescending(n => flowMap.GetValueOrDefault(n))
-                    .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f))
-                    .FirstOrDefault();
+                        .OrderByDescending(n => flowMap.GetValueOrDefault(n))
+                        .ThenBy(n => n.altitude + Random.Range(0.0f, 0.05f))
+                        .FirstOrDefault();
                 }
-                
 
                 if (next == null) { break; }
                 current = next;
@@ -795,19 +799,6 @@ public class MapGeneration
                     lowestAltitude = curRiverTile.altitude;
                     lakeStartCandidate = curRiverTile;
                 }
-
-                // should tiles that neighbour the initial river tile even be considered?
-                // would it not make more sense for the lake to always start from a tile that is in the actual river?
-                //lowestAltitude = Mathf.Min(curRiverTile.altitude, lowestAltitude); // prevent lake tiles from starting at a higher altitude than their initial river tile
-                //foreach (HexTile neighbor in curRiverTile.neighbors)
-                //{
-                //    float neighborAltitude = neighbor.altitude;
-                //    if (neighborAltitude < lowestAltitude && !river.Contains(neighbor))
-                //    {
-                //        lowestAltitude = neighborAltitude;
-                //        lakeStartCandidate = neighbor;
-                //    }
-                //}
             }
             if (lakeStartCandidate == null)
             {
