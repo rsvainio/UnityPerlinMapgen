@@ -29,6 +29,7 @@ public class HexGridInspector : Editor
     bool generateElevationFeatures = true;
     bool assignTerrains = false;
 
+    float riverPercentileToGenerate = 0.6f;
     float cellularAutomataBoundary = 0f;
 
     // mountain generation parameters
@@ -70,6 +71,7 @@ public class HexGridInspector : Editor
             assignTerrains = EditorGUILayout.Toggle("Assign terrains", assignTerrains);
             //warmPoles = EditorGUILayout.Toggle("Warm poles", warmPoles);
 
+            riverPercentileToGenerate = EditorGUILayout.Slider("River percentile to generate", riverPercentileToGenerate, 0f, 1f);
             cellularAutomataBoundary = EditorGUILayout.Slider("Cellular automata boundary", cellularAutomataBoundary, 0f, 1f);
 
             //if (GUILayout.Button("Generate Grid")) { GenerateGrid(grid); mapGenerator = new MapGeneration(grid); }
@@ -94,7 +96,7 @@ public class HexGridInspector : Editor
                 if (generatePrecipitationMap) { mapGenerator.GeneratePrecipitationMap(scale: this.precipitationScale, exponent: this.precipitationExponent); }
                 if (generateTemperatureMap) { mapGenerator.GenerateTemperatureMap(scale: this.temperatureScale, exponent: this.temperatureExponent); }
 
-                if (generateRivers) { grid.rivers = mapGenerator.GenerateRivers(); }
+                if (generateRivers) { grid.rivers = mapGenerator.GenerateRivers(riverPercentileToGenerate: this.riverPercentileToGenerate); }
 
                 foreach (HexTile tile in grid.tilesArray)
                 {

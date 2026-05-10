@@ -497,6 +497,7 @@ public class MapGeneration
         }
 
         int maxFlow = flowMap.Values.Max();
+        float pseudoMax = flowMap.Values.OrderBy(x => x).ToList()[(int)(flowMap.Count * 0.99f)]; // 99th percentile max, as the actual max is usually a gross outlier
         foreach (KeyValuePair<HexTile, int> entry in flowMap) 
         {
             HexTile tile = entry.Key;
@@ -632,7 +633,7 @@ public class MapGeneration
         bool IsValidRiverSource(HexTile tile)
         {
             float flowValue = flowMap[tile];
-            float normalizedFlow = (float) flowValue / maxFlow;
+            float normalizedFlow = (float)(Mathf.Log(flowValue + 1) / Mathf.Log(pseudoMax + 1)); // normalize after taking the logarithm to reduce right-skewness
             if (normalizedFlow > riverPercentileToGenerate)
             {
                 foreach (HexTile neighbor in tile.neighbors)
