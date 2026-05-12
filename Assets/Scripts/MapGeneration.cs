@@ -509,8 +509,23 @@ public class MapGeneration
                     if (Random.value < 0.25f)
                     {
                         newRiver = BuildLake(newRiver);
+                        List<List<HexTile>> newRiverSubsections = new List<List<HexTile>>();
+                        int subsectionStartIndex = 0;
+                        for (int i = 1; i < newRiver.Count; i++)
+                        {
+                            if (HexCoordinates.HexDistance(newRiver[i], newRiver[i - 1]) > 1 || i == newRiver.Count - 1) // river tiles are not contiguous OR it's the last tile in the river
+                            {
+                                newRiverSubsections.Add(newRiver.GetRange(subsectionStartIndex, i - subsectionStartIndex));
+                                subsectionStartIndex = i;
+                            }
+                        }
+                        Debug.Assert(newRiverSubsections.Count > 0, "Failed to split river into subsections", newRiver[0]);
+                        rivers.AddRange(newRiverSubsections);
                     }
-                    rivers.Add(newRiver);
+                    else
+                    {
+                        rivers.Add(newRiver);
+                    }
                 }
                 else
                 {
@@ -519,6 +534,118 @@ public class MapGeneration
                         riverMap[riverTile] = false;
                     }
                 }
+            }
+        }
+
+        if (riverSourceCandidates.Count < grid.height * grid.width * 0.01f)
+        {
+            Debug.LogWarning($"Found only {riverSourceCandidates.Count} candidate river source tiles, possible generation error");
+        }
+        if (rivers.Count < riverSourceCandidates.Count * 0.05f)
+        {
+            float riverAmount = (float) rivers.Count / riverSourceCandidates.Count;
+            Debug.LogWarning($"Generated rivers from only {riverAmount * 100} % ({rivers.Count}) of candidate river source tiles, possible generation error");
+        }
+        else
+        {
+            Debug.Log($"Generated {rivers.Count} rivers from source candidates");
+        }
+        return rivers;
+
+        // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
+        List<HexTile> DoRiverRecursion(HexTile tile, int riverMinimumLength, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
+        {
+            HexTile nextTile = null;
+            riverTiles ??= new List<HexTile>();
+            riverTiles.Add(tile);
+
+            // search for other rivers in a biasRange radius and bias the river generation towards those tiles
+            // this helps to generate more natural-looking drainage basins
+            if (biasTile == null)
+            {
+                int oldDistance = 0;
+                foreach (HexTile searchTile in tile.GetTilesAtRange(biasRange))
+                {
+                    if (!riverTiles.Contains(searchTile))
+                    {
+                        if (searchTile.hasRiver || searchTile.terrain == TerrainTypes.ocean || searchTile.terrain == TerrainTypes.freshWater)
+                        {
+                            int newDistance = HexCoordinates.HexDistance(tile.coordinates, searchTile.coordinates);
+                            if (newDistance < oldDistance || oldDistance == 0)
+                            {
+                                oldDistance = newDistance;
+                                biasTile = searchTile;
+                            }
+                        }
+                    }
+                }
+            }
+
+            float lowestEffectiveAltitude = tile.altitude;
+            foreach (HexTile neighbor in tile.neighbors)
+            {
+                if (neighbor.terrain == TerrainTypes.ocean || neighbor.terrain == TerrainTypes.freshWater) // the neighbouring tile is a water tile so the river terminates
+                {
+                    return riverTiles;
+                }
+                else if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
+                {
+                    if (neighbor.hasRiver) // two rivers have met and should combine here
+                    {
+                        return riverTiles;
+                    }
+                    else
+                    {
+                        // check that the tile 'neighbor' has no surrounding tiles that are part of this river other than 'tile'
+                        bool neighborIsValid = true;
+                        foreach (HexTile neighborsNeighbor in neighbor.neighbors)
+                        {
+                            if (!neighborIsValid)
+                            {
+                                break;
+                            }
+                            if (riverTiles.Contains(neighborsNeighbor))
+                            {
+                                neighborIsValid = neighborsNeighbor == tile;
+                            }
+                        }
+                        if (!neighborIsValid) { continue; }
+
+                        float alignment = 0f;
+                        if (biasTile != null)
+                        {
+                            HexCoordinates toNeighbor = neighbor.coordinates.HexSubtract(tile.coordinates);
+                            HexCoordinates toDestination = biasTile.coordinates.HexSubtract(tile.coordinates);
+                            alignment = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
+                            alignment = Mathf.Clamp01((alignment + 1f) * 0.5f);
+                        }
+                        
+                        float effectiveAltitude = neighbor.altitude - alignment * 0.15f;
+                        effectiveAltitude += Random.Range(-0.02f, 0.02f);
+                        if (effectiveAltitude < lowestEffectiveAltitude || (riverTiles.Count < riverMinimumLength && nextTile == null))
+                        {
+                            nextTile = neighbor;
+                            lowestEffectiveAltitude = effectiveAltitude;
+                        }
+                    }
+                }
+            }
+
+            if (nextTile == null)
+            {
+                if (Random.value <= 0.5f) // random chance to build a lake at the end of the river instead of terminating
+                {
+                    return BuildLake(riverTiles);
+                }
+                else
+                {
+                    Debug.Assert(riverTiles.Count >= riverMinimumLength, $"Generated a river of length {riverTiles.Count} when minimum allowed size was {riverMinimumLength}", riverTiles[0]);
+                    return riverTiles;
+                }
+            }
+            else
+            {
+                return DoRiverRecursion(nextTile, riverMinimumLength, biasTile, riverTiles);
             }
         }
 
@@ -644,149 +771,6 @@ public class MapGeneration
             }
 
             return false;
-        }
-
-        //while (riversToGenerate > 0)
-        //{
-        //    if (riverSourceCandidates.Count == 0)
-        //    {
-        //        Debug.LogWarning($"River source candidates ran out before all rivers could be generated, generated {rivers.Count} rivers");
-        //        break;
-        //    }
-        //    int i = Random.Range(0, riverSourceCandidates.Count);
-        //    HexTile tile = riverSourceCandidates[i];
-
-        //    float weight = tile.precipitation * tile.altitude;
-        //    if (true)
-        //    {
-        //        riverSourceCandidates.RemoveAt(i);
-        //        List<HexTile> newRiver = grid.pathfinding.FindPath(tile, strategy: new RiverStrategy(this));
-        //        if (newRiver.Count >= riverMinLength) // only include rivers that are big enough
-        //        {
-        //            riversToGenerate--;
-        //            if (Random.value > 0.2f)
-        //            {
-        //                newRiver = BuildLake(newRiver);
-        //            }
-        //            rivers.Add(newRiver);
-        //            foreach (HexTile riverTile in newRiver)
-        //            {
-        //                riverTile.hasRiver = true;
-        //            }
-        //        }
-        //    }
-        //}
-
-        if (riverSourceCandidates.Count < grid.height * grid.width * 0.01f)
-        {
-            Debug.LogWarning($"Found only {riverSourceCandidates.Count} candidate river source tiles, possible generation error");
-        }
-        if (rivers.Count < riverSourceCandidates.Count * 0.05f)
-        {
-            float riverAmount = (float) rivers.Count / riverSourceCandidates.Count;
-            Debug.LogWarning($"Generated rivers from only {riverAmount * 100} % ({rivers.Count}) of candidate river source tiles, possible generation error");
-        }
-        else
-        {
-            Debug.Log($"Generated {rivers.Count} rivers from source candidates");
-        }
-        return rivers;
-
-        // rivers of a length below riverMinimumLength can still be generated if the river terminates by encountering a lake, ocean or river
-        List<HexTile> DoRiverRecursion(HexTile tile, int riverMinimumLength, HexTile biasTile = null, List<HexTile> riverTiles = null, int biasRange = 10)
-        {
-            HexTile nextTile = null;
-            riverTiles ??= new List<HexTile>();
-            riverTiles.Add(tile);
-
-            // search for other rivers in a biasRange radius and bias the river generation towards those tiles
-            // this helps to generate more natural-looking drainage basins
-            if (biasTile == null)
-            {
-                int oldDistance = 0;
-                foreach (HexTile searchTile in tile.GetTilesAtRange(biasRange))
-                {
-                    if (!riverTiles.Contains(searchTile))
-                    {
-                        if (searchTile.hasRiver || searchTile.terrain == TerrainTypes.ocean || searchTile.terrain == TerrainTypes.freshWater)
-                        {
-                            int newDistance = HexCoordinates.HexDistance(tile.coordinates, searchTile.coordinates);
-                            if (newDistance < oldDistance || oldDistance == 0)
-                            {
-                                oldDistance = newDistance;
-                                biasTile = searchTile;
-                            }
-                        }
-                    }
-                }
-            }
-
-            float lowestEffectiveAltitude = tile.altitude;
-            foreach (HexTile neighbor in tile.neighbors)
-            {
-                if (neighbor.terrain == TerrainTypes.ocean || neighbor.terrain == TerrainTypes.freshWater) // the neighbouring tile is a water tile so the river terminates
-                {
-                    return riverTiles;
-                }
-                else if (!riverTiles.Contains(neighbor)) // checks that the new tile isn't already a part of the same river
-                {
-                    if (neighbor.hasRiver) // two rivers have met and should combine here
-                    {
-                        return riverTiles;
-                    }
-                    else
-                    {
-                        // check that the tile 'neighbor' has no surrounding tiles that are part of this river other than 'tile'
-                        bool neighborIsValid = true;
-                        foreach (HexTile neighborsNeighbor in neighbor.neighbors)
-                        {
-                            if (!neighborIsValid)
-                            {
-                                break;
-                            }
-                            if (riverTiles.Contains(neighborsNeighbor))
-                            {
-                                neighborIsValid = neighborsNeighbor == tile;
-                            }
-                        }
-                        if (!neighborIsValid) { continue; }
-
-                        float alignment = 0f;
-                        if (biasTile != null)
-                        {
-                            HexCoordinates toNeighbor = neighbor.coordinates.HexSubtract(tile.coordinates);
-                            HexCoordinates toDestination = biasTile.coordinates.HexSubtract(tile.coordinates);
-                            alignment = Vector3.Dot(toNeighbor.ToVec3().normalized, toDestination.ToVec3().normalized);
-                            alignment = Mathf.Clamp01((alignment + 1f) * 0.5f);
-                        }
-                        
-                        float effectiveAltitude = neighbor.altitude - alignment * 0.15f;
-                        effectiveAltitude += Random.Range(-0.02f, 0.02f);
-                        if (effectiveAltitude < lowestEffectiveAltitude || (riverTiles.Count < riverMinimumLength && nextTile == null))
-                        {
-                            nextTile = neighbor;
-                            lowestEffectiveAltitude = effectiveAltitude;
-                        }
-                    }
-                }
-            }
-
-            if (nextTile == null)
-            {
-                if (Random.value <= 0.5f) // random chance to build a lake at the end of the river instead of terminating
-                {
-                    return BuildLake(riverTiles);
-                }
-                else
-                {
-                    Debug.Assert(riverTiles.Count >= riverMinimumLength, $"Generated a river of length {riverTiles.Count} when minimum allowed size was {riverMinimumLength}", riverTiles[0]);
-                    return riverTiles;
-                }
-            }
-            else
-            {
-                return DoRiverRecursion(nextTile, riverMinimumLength, biasTile, riverTiles);
-            }
         }
 
         // TODO: handle the edge case where lakes can intersect a river and split it in two
